@@ -9,6 +9,12 @@
 /* Begin PBXBuildFile section */
 		AAD954583083C71100B571B3 /* ZAZARA_RACINGApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD954573083C71100B571B3 /* ZAZARA_RACINGApp.swift */; };
 		AAD9545A3083C71100B571B3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD954593083C71100B571B3 /* ContentView.swift */; };
+		AAD955023083C71100B571B3 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD955013083C71100B571B3 /* DesignSystem.swift */; };
+		AAD955043083C71100B571B3 /* GPSLinkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD955033083C71100B571B3 /* GPSLinkManager.swift */; };
+		AAD955063083C71100B571B3 /* ConnectGPSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD955053083C71100B571B3 /* ConnectGPSView.swift */; };
+		AAD955083083C71100B571B3 /* LinkedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD955073083C71100B571B3 /* LinkedView.swift */; };
+		AAD9550A3083C71100B571B3 /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD955093083C71100B571B3 /* AppShellView.swift */; };
+		AAD9550C3083C71100B571B3 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD9550B3083C71100B571B3 /* Localization.swift */; };
 		AAD9545C3083C71300B571B3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AAD9545B3083C71300B571B3 /* Assets.xcassets */; };
 		AAD954603083C71300B571B3 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AAD9545F3083C71300B571B3 /* Preview Assets.xcassets */; };
 		AAD9546A3083C71300B571B3 /* ZAZARA_RACINGTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD954693083C71300B571B3 /* ZAZARA_RACINGTests.swift */; };
@@ -37,6 +43,12 @@
 		AAD954543083C71100B571B3 /* ZAZARA RACING.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ZAZARA RACING.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AAD954573083C71100B571B3 /* ZAZARA_RACINGApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZAZARA_RACINGApp.swift; sourceTree = "<group>"; };
 		AAD954593083C71100B571B3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		AAD955013083C71100B571B3 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		AAD955033083C71100B571B3 /* GPSLinkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPSLinkManager.swift; sourceTree = "<group>"; };
+		AAD955053083C71100B571B3 /* ConnectGPSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectGPSView.swift; sourceTree = "<group>"; };
+		AAD955073083C71100B571B3 /* LinkedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkedView.swift; sourceTree = "<group>"; };
+		AAD955093083C71100B571B3 /* AppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellView.swift; sourceTree = "<group>"; };
+		AAD9550B3083C71100B571B3 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		AAD9545B3083C71300B571B3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AAD9545D3083C71300B571B3 /* ZAZARA_RACING.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ZAZARA_RACING.entitlements; sourceTree = "<group>"; };
 		AAD9545F3083C71300B571B3 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -97,6 +109,12 @@
 			children = (
 				AAD954573083C71100B571B3 /* ZAZARA_RACINGApp.swift */,
 				AAD954593083C71100B571B3 /* ContentView.swift */,
+				AAD955013083C71100B571B3 /* DesignSystem.swift */,
+				AAD955033083C71100B571B3 /* GPSLinkManager.swift */,
+				AAD955053083C71100B571B3 /* ConnectGPSView.swift */,
+				AAD955073083C71100B571B3 /* LinkedView.swift */,
+				AAD955093083C71100B571B3 /* AppShellView.swift */,
+				AAD9550B3083C71100B571B3 /* Localization.swift */,
 				AAD9545B3083C71300B571B3 /* Assets.xcassets */,
 				AAD9545D3083C71300B571B3 /* ZAZARA_RACING.entitlements */,
 				AAD9545E3083C71300B571B3 /* Preview Content */,
@@ -260,6 +278,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				AAD9545A3083C71100B571B3 /* ContentView.swift in Sources */,
+				AAD955023083C71100B571B3 /* DesignSystem.swift in Sources */,
+				AAD955043083C71100B571B3 /* GPSLinkManager.swift in Sources */,
+				AAD955063083C71100B571B3 /* ConnectGPSView.swift in Sources */,
+				AAD955083083C71100B571B3 /* LinkedView.swift in Sources */,
+				AAD9550A3083C71100B571B3 /* AppShellView.swift in Sources */,
+				AAD9550C3083C71100B571B3 /* Localization.swift in Sources */,
 				AAD954583083C71100B571B3 /* ZAZARA_RACINGApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -418,12 +442,16 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "ZAZARA RACING/ZAZARA_RACING.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_ASSET_PATHS = "\"ZAZARA RACING/Preview Content\"";
 				DEVELOPMENT_TEAM = J3J5MYB7G4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "ZAZARA RACING";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "ZAZARA RACING uses Bluetooth to find and link your track GPS receiver.";
+				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "ZAZARA RACING uses Bluetooth to find and link your track GPS receiver.";
+				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -438,7 +466,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.7;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = "ZAZARA.ZAZARA-RACING";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -456,12 +484,16 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "ZAZARA RACING/ZAZARA_RACING.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_ASSET_PATHS = "\"ZAZARA RACING/Preview Content\"";
 				DEVELOPMENT_TEAM = J3J5MYB7G4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "ZAZARA RACING";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "ZAZARA RACING uses Bluetooth to find and link your track GPS receiver.";
+				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "ZAZARA RACING uses Bluetooth to find and link your track GPS receiver.";
+				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -476,7 +508,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.7;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = "ZAZARA.ZAZARA-RACING";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -493,12 +525,12 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = J3J5MYB7G4;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
 				MACOSX_DEPLOYMENT_TARGET = 13.7;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = "ZAZARA.ZAZARA-RACINGTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -516,12 +548,12 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = J3J5MYB7G4;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
 				MACOSX_DEPLOYMENT_TARGET = 13.7;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = "ZAZARA.ZAZARA-RACINGTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -538,12 +570,12 @@
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = J3J5MYB7G4;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
 				MACOSX_DEPLOYMENT_TARGET = 13.7;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = "ZAZARA.ZAZARA-RACINGUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -560,12 +592,12 @@
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = J3J5MYB7G4;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
 				MACOSX_DEPLOYMENT_TARGET = 13.7;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = "ZAZARA.ZAZARA-RACINGUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;

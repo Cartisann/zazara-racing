@@ -9,9 +9,15 @@ import SwiftUI
 
 @main
 struct ZAZARA_RACINGApp: App {
+    @StateObject private var gpsLinkManager = GPSLinkManager()
+    @StateObject private var settings = AppSettings.shared
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(gpsLinkManager)
+                .environmentObject(settings)
+                .preferredColorScheme(.light)
         }
     }
 }

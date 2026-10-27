@@ -25,6 +25,6 @@ struct ContentView: View {
             )
         )
         .environmentObject(AppSettings(language: .english))
-        .preferredColorScheme(.light)
+        .preferredColorScheme(.dark)
 }
 #endif

@@ -17,7 +17,7 @@ struct ZAZARA_RACINGApp: App {
             ContentView()
                 .environmentObject(gpsLinkManager)
                 .environmentObject(settings)
-                .preferredColorScheme(.light)
+                .preferredColorScheme(.dark)
         }
     }
 }

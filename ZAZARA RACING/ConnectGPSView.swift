@@ -22,26 +22,45 @@ struct DevicesView: View {
             )
         }
         .background(Color.zzCanvas)
-        .preferredColorScheme(.light)
+        .preferredColorScheme(.dark)
         .animation(.easeInOut(duration: 0.2), value: manager.linkState)
         .animation(.easeInOut(duration: 0.2), value: manager.alert)
         .zzScreenCover(isPresented: $showLinkDetails) {
             LinkedView(manager: manager)
-                .preferredColorScheme(.light)
+                .preferredColorScheme(.dark)
         }
-        .zzOnChange(of: manager.linkEventID) { _ in
-            if manager.isConnected {
-                showLinkDetails = true
+        .onAppear {
+            autoScanSavedDevices()
+        }
+        .zzOnChange(of: manager.isConnected) { connected in
+            if !connected {
+                autoScanSavedDevices()
+            }
+        }
+        .zzOnChange(of: manager.linkState) { state in
+            if state == .idle {
+                autoScanSavedDevices()
             }
         }
         .zzOnChange(of: scenePhase) { phase in
             if phase == .background {
                 manager.stopScan()
+            } else if phase == .active {
+                manager.refreshConnectionHealth()
+                autoScanSavedDevices()
             }
         }
     }
 
     // MARK: - Page layout
+
+    private func autoScanSavedDevices() {
+        guard !manager.savedModules.isEmpty,
+              !manager.isConnected,
+              !manager.isConnecting,
+              !manager.isScanning else { return }
+        manager.startScan()
+    }
 
     private var hasAnyDeviceContent: Bool {
         manager.isConnected || manager.isScanning || !manager.savedModules.isEmpty
@@ -161,19 +180,18 @@ struct DevicesView: View {
         }
     }
 
-    private var headerSubtitle: String {
+    private var headerSubtitle: String? {
         if manager.isConnected, let module = manager.connectedModule {
             return settings.t("%@ connected", module.name)
         }
         if manager.isScanning {
-            return settings.t("Scanning for nearby GPS modules")
+            return settings.t("Scanning for nearby ZAZARA GPS")
         }
 
-        let count = manager.savedModules.count
-        if count == 0 {
+        if manager.savedModules.isEmpty {
             return settings.t("Bluetooth GPS modules")
         }
-        return settings.savedRecordSubtitle(count)
+        return nil
     }
 
     // MARK: - Notices
@@ -240,7 +258,7 @@ struct DevicesView: View {
                     .font(.system(size: compactHeight ? 16 : 17, weight: .semibold))
                     .foregroundStyle(Color.zzRed)
 
-                Text(settings.t("Connect a Bluetooth GPS receiver to get started."))
+                Text(settings.t("Connect a ZAZARA GPS receiver to get started."))
                     .font(.system(size: compactHeight ? 12.5 : 13, weight: .regular))
                     .foregroundStyle(Color.zzSecondary)
                     .multilineTextAlignment(.center)
@@ -273,7 +291,7 @@ struct DevicesView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
-                        Text(settings.t("Scanning for GPS"))
+                        Text(settings.t("Scanning for ZAZARA GPS"))
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Color.zzInk)
 
@@ -286,18 +304,6 @@ struct DevicesView: View {
                 }
 
                 Spacer(minLength: 8)
-
-                Button {
-                    manager.stopScan()
-                } label: {
-                    Text(settings.t("Stop"))
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.zzRed)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 7)
-                        .background(Capsule().fill(Color.zzRedSoft))
-                }
-                .buttonStyle(.plain)
             }
 
             Rectangle()
@@ -325,7 +331,7 @@ struct DevicesView: View {
     private var scanCountLabel: String {
         let count = manager.discoveredModules.count
         if count == 0 {
-            return settings.t("Listening for Bluetooth LE devices")
+            return settings.t("Listening for ZAZARA GPS")
         }
         return settings.devicesInRangeText(count)
     }
@@ -338,10 +344,19 @@ struct DevicesView: View {
                 ZZModuleGlyph(active: true, size: 48)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(module.name)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.zzInk)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(module.name)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(Color.zzInk)
+                            .lineLimit(1)
+
+                        Text("#\(module.shortID)")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Color.zzTertiary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.zzMutedSurface))
+                    }
 
                     HStack(spacing: 6) {
                         ZZPulseDot(color: .zzGreen, size: 4)
@@ -459,7 +474,7 @@ struct DevicesView: View {
     private var nearbySection: some View {
         VStack(alignment: .leading, spacing: 9) {
             ZZSectionHeader(
-                title: settings.t("Nearby devices"),
+                title: settings.t("New ZAZARA GPS"),
                 detail: manager.isScanning
                     ? settings.foundCountText(manager.discoveredModules.count)
                     : settings.t("Last scan")
@@ -480,11 +495,11 @@ struct DevicesView: View {
             ZZModuleGlyph(size: 42)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(settings.t("Searching for GPS modules"))
+                Text(settings.t("Searching for ZAZARA GPS"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.zzInk)
 
-                Text(settings.t("Powered on? Within 3 metres?"))
+                Text(settings.t("Only ZAZARA RACING GPS modules are shown."))
                     .font(.system(size: 11.5, weight: .regular))
                     .foregroundStyle(Color.zzSecondary)
             }
@@ -508,10 +523,19 @@ struct DevicesView: View {
                 ZZModuleGlyph(size: 44)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(device.name)
-                        .font(.system(size: 14.5, weight: .semibold))
-                        .foregroundStyle(Color.zzInk)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(device.name)
+                            .font(.system(size: 14.5, weight: .semibold))
+                            .foregroundStyle(Color.zzInk)
+                            .lineLimit(1)
+
+                        Text("#\(device.shortID)")
+                            .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Color.zzTertiary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.zzMutedSurface))
+                    }
 
                     HStack(spacing: 6) {
                         Text(settings.t("Bluetooth LE"))
@@ -564,92 +588,26 @@ struct DevicesView: View {
     private var savedSection: some View {
         VStack(alignment: .leading, spacing: 9) {
             ZZSectionHeader(
-                title: settings.t("Bluetooth records"),
+                title: settings.t("Connection records"),
                 detail: manager.isConnected
                     ? settings.t("Disconnect to switch")
                     : settings.savedCountText(manager.savedModules.count)
             )
 
             ForEach(manager.savedModules) { module in
-                savedRow(module)
-            }
-        }
-    }
-
-    private func savedRow(_ module: SavedGPSModule) -> some View {
-        let isActive = manager.isConnected && manager.connectedModule?.id == module.id
-
-        return Button {
-            manager.connect(module)
-        } label: {
-            HStack(spacing: 12) {
-                ZZModuleGlyph(active: isActive, size: 44)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(module.name)
-                        .font(.system(size: 14.5, weight: .semibold))
-                        .foregroundStyle(Color.zzInk)
-                        .lineLimit(1)
-
-                    Text(settings.lastLinkedText(module.lastLinkedAt))
-                        .font(.system(size: 11, weight: .regular))
-                        .foregroundStyle(Color.zzSecondary)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 8)
-
-                if isActive {
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(Color.zzGreen)
-                            .frame(width: 6, height: 6)
-
-                        Text(settings.t("Connected"))
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color.zzGreen)
-                    }
-                } else {
-                    HStack(spacing: 4) {
-                        Text(settings.t("Connect"))
-                            .font(.system(size: 11, weight: .semibold))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 8, weight: .bold))
-                    }
-                    .foregroundStyle(
-                        manager.isConnected ? Color.zzTertiary : Color.zzRed
-                    )
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(manager.isConnected ? Color.zzMutedSurface : Color.zzRedSoft)
-                    )
+                ZZSwipeToDelete(
+                    deleteTitle: settings.t("Delete"),
+                    onDelete: { manager.forget(module) },
+                    onTap: {
+                        guard !manager.isConnected, !manager.isConnecting else { return }
+                        manager.connect(module)
+                    },
+                    isDimmed: manager.isConnected && manager.connectedModule?.id != module.id
+                ) {
+                    ZZSavedRecordContent(manager: manager, module: module)
                 }
             }
-            .padding(14)
-            .zzCard(cornerRadius: 16)
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .buttonStyle(ZZCardButtonStyle())
-        .disabled(isActive || manager.isConnected || manager.isConnecting)
-        .opacity(manager.isConnected && !isActive ? 0.55 : 1)
-        .contextMenu {
-            Button(role: .destructive) {
-                manager.forget(module)
-            } label: {
-                Label(settings.t("Forget record"), systemImage: "trash")
-            }
-        }
-        .accessibilityLabel(settings.t("%@, Bluetooth record", module.name))
-        .accessibilityValue(settings.t(isActive ? "Connected" : "Saved"))
-        .accessibilityHint(
-            settings.t(
-                manager.isConnected
-                    ? "Disconnect the active GPS module before connecting another"
-                    : "Connects to this saved GPS module"
-            )
-        )
     }
 
     // MARK: - Helpers
@@ -657,6 +615,242 @@ struct DevicesView: View {
     private func rssiText(_ rssi: Int?) -> String {
         guard let rssi else { return "— dBm" }
         return "\(rssi) dBm"
+    }
+}
+
+// MARK: - Saved record content
+
+private struct ZZSavedRecordContent: View {
+    @ObservedObject var manager: GPSLinkManager
+    let module: SavedGPSModule
+    @EnvironmentObject private var settings: AppSettings
+
+    private var isActive: Bool {
+        manager.isConnected && manager.connectedModule?.id == module.id
+    }
+
+    private var isAvailable: Bool {
+        !isActive && manager.availableSavedModuleIDs.contains(module.id)
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZZModuleGlyph(active: isActive, size: 44)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(module.name)
+                        .font(.system(size: 14.5, weight: .semibold))
+                        .foregroundStyle(Color.zzInk)
+                        .lineLimit(1)
+
+                    Text("#\(module.shortID)")
+                        .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Color.zzTertiary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color.zzMutedSurface))
+                }
+
+                Text(settings.lastLinkedText(module.lastLinkedAt))
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(Color.zzSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+
+            Spacer(minLength: 8)
+
+            if isActive {
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(Color.zzGreen)
+                        .frame(width: 6, height: 6)
+
+                    Text(settings.t("Connected"))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.zzGreen)
+                }
+            } else if isAvailable {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.zzGreen)
+                        .frame(width: 5, height: 5)
+
+                    Text(settings.t("Available"))
+                        .font(.system(size: 10.5, weight: .semibold))
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .bold))
+                }
+                .foregroundStyle(Color.zzGreen)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color.zzGreenSoft))
+            } else {
+                HStack(spacing: 4) {
+                    Text(settings.t("Connect"))
+                        .font(.system(size: 11, weight: .semibold))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .bold))
+                }
+                .foregroundStyle(
+                    manager.isConnected ? Color.zzTertiary : Color.zzRed
+                )
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(manager.isConnected ? Color.zzMutedSurface : Color.zzRedSoft)
+                )
+            }
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                manager.forget(module)
+            } label: {
+                Label(settings.t("Forget record"), systemImage: "trash")
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(settings.t("%@, connection record", module.name))
+        .accessibilityValue(
+            settings.t(isActive ? "Connected" : (isAvailable ? "Available to connect" : "Saved"))
+        )
+        .accessibilityHint(
+            settings.t(
+                manager.isConnected
+                    ? "Disconnect the active GPS module before connecting another"
+                    : "Connects to this saved GPS module"
+            )
+        )
+        .accessibilityAction {
+            guard !manager.isConnected, !manager.isConnecting else { return }
+            manager.connect(module)
+        }
+    }
+}
+
+// MARK: - Swipe to delete
+
+private struct ZZSwipeToDelete<Content: View>: View {
+    let deleteTitle: String
+    let onDelete: () -> Void
+    let onTap: () -> Void
+    let isDimmed: Bool
+    let content: Content
+
+    @State private var offset: CGFloat = 0
+    @State private var dragStartOffset: CGFloat = 0
+    @State private var isDragging = false
+    @State private var tapSuppressedUntil = Date.distantPast
+
+    private let actionWidth: CGFloat = 84
+
+    init(
+        deleteTitle: String,
+        onDelete: @escaping () -> Void,
+        onTap: @escaping () -> Void,
+        isDimmed: Bool = false,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.deleteTitle = deleteTitle
+        self.onDelete = onDelete
+        self.onTap = onTap
+        self.isDimmed = isDimmed
+        self.content = content()
+    }
+
+    private var revealProgress: CGFloat {
+        min(1, max(0, -offset / actionWidth))
+    }
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            content
+                .padding(14)
+                .zzCard(cornerRadius: 16, squareTrailing: offset < 0)
+                .contentShape(Rectangle())
+                .opacity(isDimmed ? 0.55 : 1)
+                .offset(x: offset)
+                .onTapGesture {
+                    guard !isDragging, Date() >= tapSuppressedUntil else { return }
+                    if offset < 0 {
+                        close()
+                    } else {
+                        onTap()
+                    }
+                }
+        }
+        .background(alignment: .trailing) {
+            ZStack {
+                Color.zzRed
+
+                VStack(spacing: 4) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 14, weight: .semibold))
+
+                    Text(deleteTitle)
+                        .font(.system(size: 10.5, weight: .semibold))
+                }
+                .foregroundStyle(Color.white)
+            }
+            .frame(width: actionWidth)
+            .opacity(Double(revealProgress))
+            .accessibilityHidden(true)
+        }
+        .overlay(alignment: .trailing) {
+            if offset <= -actionWidth + 1 && !isDragging {
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Color.clear
+                        .frame(width: actionWidth)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(deleteTitle))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .simultaneousGesture(dragGesture)
+        .accessibilityAction(named: Text(deleteTitle)) {
+            onDelete()
+        }
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 14)
+            .onChanged { value in
+                let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
+                guard isHorizontal else { return }
+
+                if !isDragging {
+                    isDragging = true
+                    dragStartOffset = offset
+                }
+
+                let proposed = dragStartOffset + value.translation.width
+                offset = min(0, max(-actionWidth, proposed))
+            }
+            .onEnded { value in
+                guard isDragging else { return }
+                isDragging = false
+                tapSuppressedUntil = Date().addingTimeInterval(0.2)
+
+                let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
+                let shouldOpen = isHorizontal && offset < -actionWidth / 2
+                withAnimation(.easeOut(duration: 0.34)) {
+                    offset = shouldOpen ? -actionWidth : 0
+                }
+            }
+    }
+
+    private func close() {
+        withAnimation(.easeOut(duration: 0.34)) {
+            offset = 0
+        }
     }
 }
 

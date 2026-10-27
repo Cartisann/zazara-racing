@@ -16,6 +16,10 @@ struct LinkedView: View {
         manager.connectedModule?.name ?? "GPS Module"
     }
 
+    private var moduleShortID: String? {
+        manager.connectedModule?.shortID
+    }
+
     var body: some View {
         ZStack {
             Color.zzCanvas.ignoresSafeArea()
@@ -41,7 +45,7 @@ struct LinkedView: View {
             }
         }
         .background(Color.zzCanvas)
-        .preferredColorScheme(.light)
+        .preferredColorScheme(.dark)
         .interactiveDismissDisabled()
         .zzOnChange(of: manager.linkState) { state in
             if state != .connected {
@@ -57,20 +61,9 @@ struct LinkedView: View {
             ZZWordmark()
             Spacer(minLength: 8)
             ZZStatusPill(text: settings.t("Connected"), color: .zzGreen)
-
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.zzSecondary)
-                    .frame(width: 30, height: 30)
-                    .background(Circle().fill(Color.zzMutedSurface))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(settings.t("Back to devices"))
         }
         .padding(.horizontal, 20)
+        .padding(.trailing, 58)
         .padding(.top, 10)
         .padding(.bottom, 12)
         .frame(maxWidth: 680)
@@ -80,6 +73,22 @@ struct LinkedView: View {
             Rectangle()
                 .fill(Color.zzLine)
                 .frame(height: 0.5)
+        }
+        .overlay(alignment: .topTrailing) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.zzInk)
+                    .frame(width: 38, height: 38)
+                    .background(Circle().fill(Color.zzMutedSurface))
+                    .overlay(Circle().stroke(Color.zzLine, lineWidth: 0.7))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(settings.t("Back to devices"))
+            .padding(.trailing, 30)
+            .padding(.top, 8)
         }
     }
 
@@ -127,10 +136,21 @@ struct LinkedView: View {
                 ZZModuleGlyph(active: true, size: 48)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(moduleName)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.zzInk)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(moduleName)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(Color.zzInk)
+                            .lineLimit(1)
+
+                        if let moduleShortID {
+                            Text("#\(moduleShortID)")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(Color.zzTertiary)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.zzMutedSurface))
+                        }
+                    }
 
                     HStack(spacing: 6) {
                         Circle()

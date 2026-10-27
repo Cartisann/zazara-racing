@@ -120,13 +120,13 @@ cat > "$APP/Info.plist" <<'PLIST'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.9</string>
+    <string>2.0</string>
     <key>CFBundleSupportedPlatforms</key>
     <array>
         <string>iPhoneOS</string>
     </array>
     <key>CFBundleVersion</key>
-    <string>10</string>
+    <string>48</string>
     <key>DTCompiler</key>
     <string>com.apple.compilers.llvm.clang.1_0</string>
     <key>DTPlatformBuild</key>
@@ -182,7 +182,7 @@ cat > "$APP/Info.plist" <<'PLIST'
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
     <key>UIUserInterfaceStyle</key>
-    <string>Light</string>
+    <string>Dark</string>
     <key>UIDeviceFamily</key>
     <array>
         <integer>1</integer>

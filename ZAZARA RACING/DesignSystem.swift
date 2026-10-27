@@ -2,7 +2,7 @@
 //  DesignSystem.swift
 //  ZAZARA RACING
 //
-//  Light, iOS-native visual language with ZAZARA red accents.
+//  Black and graphite visual language with ZAZARA red accents.
 //
 
 import SwiftUI
@@ -27,19 +27,19 @@ extension Color {
         )
     }
 
-    static let zzCanvas = Color(zzHex: 0xF4F4F6)
-    static let zzSurface = Color.white
-    static let zzMutedSurface = Color(zzHex: 0xEDEDF0)
-    static let zzInk = Color(zzHex: 0x141416)
-    static let zzSecondary = Color(zzHex: 0x77777F)
-    static let zzTertiary = Color(zzHex: 0xA5A5AD)
-    static let zzLine = Color(zzHex: 0xE4E4E8)
-    static let zzRed = Color(zzHex: 0xE21E2B)
-    static let zzRedSoft = Color(zzHex: 0xFBEAEC)
-    static let zzGreen = Color(zzHex: 0x1E9D55)
-    static let zzGreenSoft = Color(zzHex: 0xE9F6EF)
-    static let zzAmber = Color(zzHex: 0xC98200)
-    static let zzAmberSoft = Color(zzHex: 0xFFF4E1)
+    static let zzCanvas = Color(zzHex: 0x08080A)
+    static let zzSurface = Color(zzHex: 0x16161A)
+    static let zzMutedSurface = Color(zzHex: 0x222228)
+    static let zzInk = Color(zzHex: 0xF2F2F5)
+    static let zzSecondary = Color(zzHex: 0xA2A2AC)
+    static let zzTertiary = Color(zzHex: 0x73737D)
+    static let zzLine = Color(zzHex: 0x2D2D34)
+    static let zzRed = Color(zzHex: 0xFF3B45)
+    static let zzRedSoft = Color(zzHex: 0x3A181D)
+    static let zzGreen = Color(zzHex: 0x35D07F)
+    static let zzGreenSoft = Color(zzHex: 0x102B1E)
+    static let zzAmber = Color(zzHex: 0xF0B44A)
+    static let zzAmberSoft = Color(zzHex: 0x30250F)
 }
 
 // MARK: - Type
@@ -297,19 +297,30 @@ struct ZZSectionHeader: View {
 private struct ZZCardModifier: ViewModifier {
     var cornerRadius: CGFloat
     var muted: Bool
+    var squareTrailing: Bool = false
+
+    private var cardShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            topLeadingRadius: cornerRadius,
+            bottomLeadingRadius: cornerRadius,
+            bottomTrailingRadius: squareTrailing ? 0 : cornerRadius,
+            topTrailingRadius: squareTrailing ? 0 : cornerRadius,
+            style: .continuous
+        )
+    }
 
     func body(content: Content) -> some View {
         content
             .background(
                 (muted ? Color.zzMutedSurface : Color.zzSurface),
-                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                in: cardShape
             )
             .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                cardShape
                     .stroke(Color.zzLine.opacity(muted ? 0.5 : 0.9), lineWidth: 0.8)
             )
             .shadow(
-                color: Color.black.opacity(muted ? 0 : 0.035),
+                color: Color.black.opacity(muted ? 0 : 0.28),
                 radius: 10,
                 x: 0,
                 y: 4
@@ -318,8 +329,18 @@ private struct ZZCardModifier: ViewModifier {
 }
 
 extension View {
-    func zzCard(cornerRadius: CGFloat = 18, muted: Bool = false) -> some View {
-        modifier(ZZCardModifier(cornerRadius: cornerRadius, muted: muted))
+    func zzCard(
+        cornerRadius: CGFloat = 18,
+        muted: Bool = false,
+        squareTrailing: Bool = false
+    ) -> some View {
+        modifier(
+            ZZCardModifier(
+                cornerRadius: cornerRadius,
+                muted: muted,
+                squareTrailing: squareTrailing
+            )
+        )
     }
 }
 
@@ -327,7 +348,7 @@ extension View {
 
 struct ZZLiquidGlassBackground: View {
     var cornerRadius: CGFloat = 30
-    var tint: Color = .white
+    var tint: Color = Color(zzHex: 0x8E8E98)
 
     var body: some View {
         ZStack {
@@ -347,9 +368,9 @@ struct ZZLiquidGlassBackground: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.92),
-                            Color.white.opacity(0.16),
-                            Color.zzRed.opacity(0.12)
+                            Color.white.opacity(0.34),
+                            Color.white.opacity(0.06),
+                            Color.zzRed.opacity(0.16)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -657,7 +678,7 @@ struct ZZConnectingOverlay: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.22)
+            Color.black.opacity(0.62)
                 .ignoresSafeArea()
 
             VStack(spacing: 22) {
@@ -736,53 +757,47 @@ struct ZZTrackShape: Shape {
             CGPoint(x: rect.minX + x * rect.width, y: rect.minY + y * rect.height)
         }
 
+        // Closed Catmull-Rom spline. Every segment is a cubic curve with
+        // matching tangents at its neighbours, so the outline has no sharp
+        // corners or cusps at any scale.
+        // Simplified Monza silhouette: long left straight, Curva Grande,
+        // Lesmo, the inner Serraglio/Ascari return and Parabolica.
+        let points = [
+            point(0.18, 0.78),
+            point(0.22, 0.55),
+            point(0.28, 0.35),
+            point(0.30, 0.25),
+            point(0.43, 0.12),
+            point(0.62, 0.12),
+            point(0.80, 0.18),
+            point(0.88, 0.28),
+            point(0.85, 0.42),
+            point(0.70, 0.48),
+            point(0.50, 0.58),
+            point(0.44, 0.66),
+            point(0.34, 0.82)
+        ]
+
         var path = Path()
-        path.move(to: point(0.06, 0.68))
-        path.addCurve(
-            to: point(0.23, 0.32),
-            control1: point(0.07, 0.5),
-            control2: point(0.12, 0.35)
-        )
-        path.addCurve(
-            to: point(0.48, 0.28),
-            control1: point(0.32, 0.29),
-            control2: point(0.38, 0.26)
-        )
-        path.addCurve(
-            to: point(0.68, 0.18),
-            control1: point(0.56, 0.3),
-            control2: point(0.6, 0.18)
-        )
-        path.addCurve(
-            to: point(0.9, 0.32),
-            control1: point(0.78, 0.18),
-            control2: point(0.88, 0.24)
-        )
-        path.addCurve(
-            to: point(0.84, 0.58),
-            control1: point(0.92, 0.41),
-            control2: point(0.91, 0.5)
-        )
-        path.addCurve(
-            to: point(0.65, 0.64),
-            control1: point(0.77, 0.66),
-            control2: point(0.72, 0.61)
-        )
-        path.addCurve(
-            to: point(0.5, 0.8),
-            control1: point(0.58, 0.66),
-            control2: point(0.56, 0.76)
-        )
-        path.addCurve(
-            to: point(0.3, 0.78),
-            control1: point(0.44, 0.84),
-            control2: point(0.37, 0.82)
-        )
-        path.addCurve(
-            to: point(0.06, 0.68),
-            control1: point(0.2, 0.74),
-            control2: point(0.12, 0.72)
-        )
+        path.move(to: points[0])
+
+        for index in 0..<points.count {
+            let p0 = points[(index - 1 + points.count) % points.count]
+            let p1 = points[index]
+            let p2 = points[(index + 1) % points.count]
+            let p3 = points[(index + 2) % points.count]
+
+            let control1 = CGPoint(
+                x: p1.x + (p2.x - p0.x) / 6,
+                y: p1.y + (p2.y - p0.y) / 6
+            )
+            let control2 = CGPoint(
+                x: p2.x - (p3.x - p1.x) / 6,
+                y: p2.y - (p3.y - p1.y) / 6
+            )
+            path.addCurve(to: p2, control1: control1, control2: control2)
+        }
+
         path.closeSubpath()
         return path
     }

@@ -102,12 +102,12 @@ struct LinkedView: View {
                     .frame(width: 92, height: 92)
 
                 Circle()
-                    .stroke(Color.zzRed.opacity(0.14), lineWidth: 1)
+                    .stroke(Color.zzInk.opacity(0.18), lineWidth: 1)
                     .frame(width: 106, height: 106)
 
                 Image(systemName: "checkmark")
                     .font(.system(size: 32, weight: .bold))
-                    .foregroundStyle(Color.zzRed)
+                    .foregroundStyle(Color.zzInk)
             }
 
             VStack(spacing: 6) {
@@ -258,7 +258,7 @@ struct LinkedView: View {
         HStack(spacing: 12) {
             Image(systemName: "antenna.radiowaves.left.and.right")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.zzRed)
+                .foregroundStyle(Color.zzInk)
                 .frame(width: 34, height: 34)
                 .background(Circle().fill(Color.zzRedSoft))
 

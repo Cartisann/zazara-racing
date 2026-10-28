@@ -195,6 +195,17 @@ final class AppSettings: ObservableObject {
         "Scanning for nearby ZAZARA GPS": "正在扫描附近的 ZAZARA GPS",
         "%@ connected": "%@ 已连接",
 
+        // Track dashboard
+        "Overview": "总览",
+        "Dashboard": "仪表",
+        "G-Force": "G 值",
+        "Lateral": "横向",
+        "Longitudinal": "纵向",
+        "Speed": "速度",
+        "No G data yet": "暂无 G 值数据",
+        "Route": "路程",
+        "No route data yet": "暂无路程数据",
+
         // Devices
         "Add GPS device": "添加 GPS 设备",
         "Stop scanning": "停止扫描",
@@ -344,6 +355,8 @@ final class AppSettings: ObservableObject {
         "Connect a GPS device": "连接 GPS 设备",
         "NEXT MILESTONE": "下一阶段",
         "Track sessions are next": "赛道计时即将推出",
+        "Track library and lap timing": "赛道库与圈速计时",
+        "Track library is coming soon": "赛道库即将上线",
         "Connect a Bluetooth GPS receiver to record circuits, lap times and session history.": "连接蓝牙 GPS 接收器，记录赛道、圈速和会话历史。",
         "GPS receiver": "GPS接收器",
         "Time": "时间",

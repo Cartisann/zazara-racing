@@ -251,7 +251,7 @@ struct DevicesView: View {
 
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: compactHeight ? 38 : 46, weight: .ultraLight))
-                .foregroundStyle(Color.zzRed)
+                .foregroundStyle(Color.zzInk)
 
             VStack(spacing: 7) {
                 Text(settings.t("No devices connected"))
@@ -570,7 +570,7 @@ struct DevicesView: View {
 
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.zzRed)
+                        .foregroundStyle(Color.zzInk)
                 }
             }
             .padding(13)

@@ -50,36 +50,6 @@ extension Font {
     }
 }
 
-// MARK: - Device metrics
-
-enum ZZDeviceMetrics {
-    static var screenSize: CGSize {
-        #if os(iOS)
-        if let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first {
-            return scene.screen.bounds.size
-        }
-        return UIScreen.main.bounds.size
-        #else
-        return .zero
-        #endif
-    }
-
-    /// iPhone Duo outer display: 466 x 678 points (either orientation).
-    static var isDuoOuterDisplay: Bool {
-        #if os(iOS)
-        let size = screenSize
-        let shortSide = min(size.width, size.height)
-        let longSide = max(size.width, size.height)
-        return shortSide >= 420
-            && shortSide <= 500
-            && longSide >= 620
-            && longSide <= 760
-        #else
-        return false
-        #endif
-    }
-}
-
 // MARK: - Platform helpers
 
 enum ZZPlatform {
@@ -344,43 +314,6 @@ extension View {
     }
 }
 
-// MARK: - Liquid Glass
-
-struct ZZLiquidGlassBackground: View {
-    var cornerRadius: CGFloat = 30
-    var tint: Color = Color(zzHex: 0x8E8E98)
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
-
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [tint.opacity(0.28), tint.opacity(0.055)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.34),
-                            Color.white.opacity(0.06),
-                            Color.zzRed.opacity(0.16)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.8
-                )
-        }
-    }
-}
-
 // MARK: - Button styles
 
 struct ZZPrimaryButtonStyle: ButtonStyle {
@@ -544,13 +477,13 @@ struct ZZScanRadar: View {
                 ZZRadarRing(delay: 0.85)
             } else {
                 Circle()
-                    .stroke(Color.zzRed.opacity(0.25), lineWidth: 1)
+                    .stroke(Color.zzInk.opacity(0.3), lineWidth: 1)
                     .frame(width: 46, height: 46)
             }
 
             Image(systemName: "antenna.radiowaves.left.and.right")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Color.zzRed)
+                .foregroundStyle(Color.zzInk)
                 .rotationEffect(.degrees(spinning ? 8 : -8))
                 .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: spinning)
         }
@@ -569,7 +502,7 @@ private struct ZZRadarRing: View {
 
     var body: some View {
         Circle()
-            .stroke(Color.zzRed.opacity(0.4), lineWidth: 1)
+            .stroke(Color.zzInk.opacity(0.4), lineWidth: 1)
             .frame(width: 40, height: 40)
             .scaleEffect(animate ? 1.35 : 0.6)
             .opacity(animate ? 0 : 0.5)

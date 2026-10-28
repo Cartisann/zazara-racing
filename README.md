@@ -130,6 +130,7 @@ ZAZARA 硬件保留 RaceChrono 的 `0x1FF8` 服务，因此 RaceChrono 仍可正
   - 语言切换：`Picker(.segmented)`；删除确认：`confirmationDialog`
   - Track 总览/仪表分段：居中浮动胶囊 tab（系统没有可直接内嵌的紧凑 tab 组件；用 `.ultraThinMaterial` + `matchedGeometryEffect` 实现，图标和红色选中态与主 Tab 一致）
   - Timing 的 Drag/Track 详情页不隐藏主 Tab：`.toolbar(.hidden, for: .tabBar)` 会让系统在返回时延迟恢复主 Tab
+  - Duo 外屏锁定竖屏：`AppDelegate.supportedInterfaceOrientationsFor` 根据物理屏幕比例和点宽识别外屏（3x，约 466 pt），只返回 `.portrait`；外屏不再进入横屏。内屏仍可旋转
   - Duo 内屏横屏时，系统 `.sidebarAdaptable` 默认把主 Tab 侧栏放在左侧；仅在 Duo 内屏横屏（phone、约 1.4:1、宽 >900、高 >600）给 `TabView` 设 RTL，把侧栏放回右侧，同时各 Tab 内容强制 LTR，避免页面镜像。普通 iPhone / iPad 不触发
   - 仪表：SwiftUI `Gauge` + `GaugeStyle`；G 值点阵：Swift Charts `PointMark`
   - 蓝牙：CoreBluetooth；图标：SF Symbols；日期时间：Foundation `DateFormatter`

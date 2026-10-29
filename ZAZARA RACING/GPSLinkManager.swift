@@ -71,6 +71,11 @@ struct GPSLinkAlert: Identifiable, Equatable {
 }
 
 /// Latest decoded GPS values for the live Track dashboard.
+struct TrackRoutePoint: Equatable {
+    let latitude: Double
+    let longitude: Double
+}
+
 struct TrackTelemetry: Equatable {
     var date: Date?
     var satellites: Int?
@@ -85,6 +90,7 @@ struct TrackTelemetry: Equatable {
     var distanceKm: Double = 0
     var speedKPH: Double?
     var updateRateHz: Double = 0
+    var route: [TrackRoutePoint] = []
 }
 
 // MARK: - Manager
@@ -160,6 +166,7 @@ final class GPSLinkManager: NSObject, ObservableObject {
     private var trackSessionStart: Date?
     private var lastGPSFix: (lat: Double, lon: Double)?
     private var trackDistanceMeters: Double = 0
+    private var trackRoute: [TrackRoutePoint] = []
     private var rateWindowStart: Date?
     private var rateWindowCount: Int = 0
     private var lastTelemetryPublish = Date.distantPast
@@ -689,6 +696,7 @@ final class GPSLinkManager: NSObject, ObservableObject {
         trackSessionStart = startSession ? Date() : nil
         lastGPSFix = nil
         trackDistanceMeters = 0
+        trackRoute.removeAll()
         rateWindowStart = nil
         rateWindowCount = 0
         lastTelemetryPublish = .distantPast
@@ -819,27 +827,59 @@ final class GPSLinkManager: NSObject, ObservableObject {
                 }
             }
             lastGPSFix = (latitude, longitude)
+
+            if let last = trackRoute.last {
+                if abs(latitude - last.latitude) > 0.000001
+                    || abs(longitude - last.longitude) > 0.000001 {
+                    trackRoute.append(TrackRoutePoint(latitude: latitude, longitude: longitude))
+                }
+            } else {
+                trackRoute.append(TrackRoutePoint(latitude: latitude, longitude: longitude))
+            }
+            if trackRoute.count > 600 {
+                trackRoute.removeFirst(trackRoute.count - 600)
+            }
         }
         telemetry.distanceKm = trackDistanceMeters / 1000
+        telemetry.route = trackRoute
 
         if trackSessionStart == nil {
             trackSessionStart = now
         }
         telemetry.elapsed = trackSessionStart.map { now.timeIntervalSince($0) } ?? 0
 
-        if let windowStart = rateWindowStart {
-            rateWindowCount += 1
-            let interval = now.timeIntervalSince(windowStart)
-            if interval >= 1 {
-                telemetry.updateRateHz = Double(rateWindowCount) / interval
-                rateWindowStart = now
-                rateWindowCount = 0
+        // Derive the update rate from the GPS fix timestamps carried in the
+        // RaceChrono packets (2 ms resolution), not from BLE notification
+        // arrival. Connection interval jitter and notification coalescing
+        // therefore do not affect the displayed Hz.
+        if let fixDate = telemetry.date {
+            if let windowStart = rateWindowStart {
+                let interval = fixDate.timeIntervalSince(windowStart)
+
+                if interval < 0 || interval > 2 {
+                    // GPS time jumped or the stream stalled: start a new
+                    // window instead of reporting a bogus low rate.
+                    rateWindowStart = fixDate
+                    rateWindowCount = 0
+                    telemetry.updateRateHz = 0
+                } else if interval >= 1 {
+                    rateWindowCount += 1
+                    telemetry.updateRateHz = Double(rateWindowCount) / interval
+                    rateWindowStart = fixDate
+                    rateWindowCount = 0
+                } else {
+                    // Duplicate timestamps should not inflate the count.
+                    if interval > 0 {
+                        rateWindowCount += 1
+                    }
+                    telemetry.updateRateHz = pendingTelemetry.updateRateHz
+                }
             } else {
-                telemetry.updateRateHz = pendingTelemetry.updateRateHz
+                rateWindowStart = fixDate
+                rateWindowCount = 0
+                telemetry.updateRateHz = 0
             }
         } else {
-            rateWindowStart = now
-            rateWindowCount = 0
             telemetry.updateRateHz = pendingTelemetry.updateRateHz
         }
 

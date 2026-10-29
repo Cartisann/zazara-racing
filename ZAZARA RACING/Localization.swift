@@ -205,6 +205,13 @@ final class AppSettings: ObservableObject {
         "No G data yet": "暂无 G 值数据",
         "Route": "路程",
         "No route data yet": "暂无路程数据",
+        "This run": "本轮时间",
+        "Last lap": "上一圈成绩",
+        "This lap": "本圈成绩",
+        "Best result": "最快成绩",
+        "Time difference": "时间差",
+        "Map": "地图",
+        "No map data yet": "暂无地图数据",
 
         // Devices
         "Add GPS device": "添加 GPS 设备",

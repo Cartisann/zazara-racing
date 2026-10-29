@@ -6,6 +6,7 @@
 //
 
 import Charts
+import MapKit
 import SwiftUI
 import UniformTypeIdentifiers
 #if os(iOS)
@@ -51,6 +52,30 @@ enum AppTab: String, CaseIterable, Identifiable {
 private enum TimingRoute: Hashable {
     case drag
     case track
+}
+
+/// Cover panel of the Duo: phone idiom, portrait, ~1.455:1 display, 3x panel.
+/// Both the Duo cover and inner displays are phone-idiom screens with an
+/// almost square native aspect (about 1.455:1), unlike a normal iPhone.
+private func isDuoDisplay() -> Bool {
+    #if os(iOS)
+    guard UIDevice.current.userInterfaceIdiom == .phone else { return false }
+    guard let scene = UIApplication.shared.connectedScenes
+        .compactMap({ $0 as? UIWindowScene })
+        .first(where: { $0.activationState == .foregroundActive })
+        ?? UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first
+    else { return false }
+
+    let native = scene.screen.nativeBounds
+    guard native.width > 0, native.height > 0 else { return false }
+
+    let ratio = max(native.width, native.height) / min(native.width, native.height)
+    return ratio < 1.6
+    #else
+    return false
+    #endif
 }
 
 struct AppShellView: View {
@@ -851,6 +876,55 @@ struct MoreView: View {
     }
 }
 
+// MARK: - Disable system swipe back
+
+#if os(iOS)
+private struct SwipeBackDisabler: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = UIViewController()
+        controller.view.backgroundColor = .clear
+        return controller
+    }
+
+    func updateUIViewController(_ controller: UIViewController, context: Context) {
+        DispatchQueue.main.async {
+            controller.navigationController?.interactivePopGestureRecognizer?.isEnabled = false
+        }
+    }
+
+    static func dismantleUIViewController(_ controller: UIViewController, coordinator: ()) {
+        controller.navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+    }
+}
+#endif
+
+/// The system TabView's swipe-between-tabs gesture takes priority over the
+/// NavigationStack's interactive pop. Give both page edges an inward swipe
+/// that dismisses the pushed timing page, so testers can always go back.
+private struct TrackEditCircleGlass: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if #available(iOS 26.0, *) {
+            content.glassEffect(.regular.interactive(), in: .circle)
+        } else {
+            fallback(content)
+        }
+        #else
+        fallback(content)
+        #endif
+    }
+
+    private func fallback(_ content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial, in: Circle())
+            .overlay(
+                Circle().strokeBorder(Color.zzLine, lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.28), radius: 12, y: 4)
+    }
+}
+
 // MARK: - Drag timing page
 
 private struct DragTimingMetric: Identifiable {
@@ -914,6 +988,7 @@ private enum DragInputField: Hashable {
 
 struct DragTimingView: View {
     @EnvironmentObject private var settings: AppSettings
+    @Environment(\.dismiss) private var dismiss
 
     @State private var showAddOptions = false
     @State private var addMode: DragAddMode?
@@ -950,6 +1025,32 @@ struct DragTimingView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
         #endif
+        .toolbar {
+            #if os(iOS)
+            ToolbarItem(placement: .topBarLeading) {
+                timingBackButton
+            }
+            #else
+            ToolbarItem(placement: .navigation) {
+                timingBackButton
+            }
+            #endif
+        }
+        .navigationBarBackButtonHidden(true)
+        #if os(iOS)
+        .background(SwipeBackDisabler().frame(width: 0, height: 0))
+        #endif
+    }
+
+    private var timingBackButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.zzInk)
+        }
+        .accessibilityLabel(settings.t("Back"))
     }
 
     private var addControl: some View {
@@ -1354,12 +1455,23 @@ struct TrackTimingView: View {
     @ObservedObject var manager: GPSLinkManager
 
     @EnvironmentObject private var settings: AppSettings
+    @Environment(\.dismiss) private var dismiss
     @AppStorage("zazara.trackTileOrder.v1") private var orderRaw = ""
     @State private var order = TrackTileID.defaultOrder
-    @State private var isEditing = false
+    #if os(iOS)
+    @Environment(\.editMode) private var editMode
+    #endif
     @State private var draggingID: String?
     @State private var section: TrackSection = .overview
     @Namespace private var sectionNamespace
+
+    private var isEditing: Bool {
+        #if os(iOS)
+        editMode?.wrappedValue.isEditing == true
+        #else
+        false
+        #endif
+    }
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 8),
@@ -1383,19 +1495,34 @@ struct TrackTimingView: View {
             Color.zzCanvas.ignoresSafeArea()
 
             VStack(spacing: 0) {
+                #if os(iOS)
+                TabView(selection: $section) {
+                    overviewContent
+                        .tag(TrackSection.overview)
+
+                    TrackDashboardView(manager: manager)
+                        .tag(TrackSection.dashboard)
+
+                    TrackTimingMapView(manager: manager)
+                        .tag(TrackSection.timing)
+
+                    TrackFullMapView(manager: manager)
+                        .tag(TrackSection.map)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                #else
                 ZStack {
                     overviewContent
                         .opacity(section == .overview ? 1 : 0)
                         .allowsHitTesting(section == .overview)
-                        .accessibilityHidden(section != .overview)
 
                     TrackDashboardView(manager: manager)
                         .opacity(section == .dashboard ? 1 : 0)
                         .allowsHitTesting(section == .dashboard)
-                        .accessibilityHidden(section != .dashboard)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .animation(.easeInOut(duration: 0.18), value: section)
+                #endif
 
                 sectionBar
             }
@@ -1406,15 +1533,92 @@ struct TrackTimingView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
+            #if os(iOS)
+            ToolbarItem(placement: .topBarLeading) {
+                timingBackButton
+            }
+            #else
+            ToolbarItem(placement: .navigation) {
+                timingBackButton
+            }
+            #endif
             ToolbarItem(placement: .primaryAction) {
                 trackToolbarContent
             }
         }
+        .navigationBarBackButtonHidden(true)
         .onAppear(perform: normalizeOrder)
         .zzOnChange(of: order) { newOrder in
             orderRaw = newOrder.joined(separator: ",")
         }
+        .overlay(alignment: .topTrailing) {
+            #if os(iOS)
+            if section == .overview {
+                overviewEditButton
+                    .padding(.top, isDuoDisplay() ? 160 : 52)
+                    .padding(.trailing, 25)
+                    .ignoresSafeArea(.container, edges: .trailing)
+            }
+            #endif
+        }
+        #if os(iOS)
+        .background(SwipeBackDisabler().frame(width: 0, height: 0))
+        #endif
     }
+
+    private var timingBackButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.zzInk)
+        }
+        .accessibilityLabel(settings.t("Back"))
+    }
+
+    #if os(iOS)
+    @ViewBuilder
+    private var overviewEditButton: some View {
+        if #available(iOS 26.0, *) {
+            Button {
+                toggleEditMode()
+            } label: {
+                Image(systemName: isEditing ? "checkmark" : "pencil.line")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.zzInk)
+                    .frame(width: 48, height: 48)
+                    .contentShape(Circle())
+                    .modifier(TrackEditCircleGlass())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(settings.t(isEditing ? "Done" : "Edit"))
+        } else {
+            Button {
+                toggleEditMode()
+            } label: {
+                Image(systemName: isEditing ? "checkmark" : "pencil.line")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.zzInk)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay(Circle().strokeBorder(Color.zzLine, lineWidth: 0.5))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(settings.t(isEditing ? "Done" : "Edit"))
+        }
+    }
+    #endif
+
+    #if os(iOS)
+    private func toggleEditMode() {
+        guard let editMode else { return }
+        withAnimation(.easeInOut(duration: 0.18)) {
+            editMode.wrappedValue = isEditing ? .inactive : .active
+        }
+    }
+    #endif
 
     private var overviewContent: some View {
         GeometryReader { proxy in
@@ -1429,8 +1633,10 @@ struct TrackTimingView: View {
     private var portraitOverview: some View {
         ScrollView {
             VStack(spacing: 10) {
+                overviewStatusHeader
+
                 if isEditing {
-                    editHint
+                    overviewStatusRow
                 }
 
                 LazyVGrid(columns: columns, spacing: 8) {
@@ -1453,13 +1659,19 @@ struct TrackTimingView: View {
         let topPadding: CGFloat = 8
         let bottomPadding: CGFloat = 8
         let spacing: CGFloat = 8
-        let hintHeight: CGFloat = isEditing ? 26 : 0
-        let availableHeight = max(0, size.height - topPadding - bottomPadding - hintHeight)
+        let headerHeight: CGFloat = 50
+        let statusRowHeight: CGFloat = isEditing ? 28 : 0
+        let availableHeight = max(
+            0,
+            size.height - topPadding - bottomPadding - headerHeight - statusRowHeight - spacing * 2
+        )
         let tileHeight = max(0, (availableHeight - spacing * 3) / 4)
 
-        return VStack(spacing: 10) {
+        return VStack(spacing: spacing) {
+            overviewStatusHeader
+
             if isEditing {
-                editHint
+                overviewStatusRow
             }
 
             LazyVGrid(columns: columns, spacing: spacing) {
@@ -1475,11 +1687,52 @@ struct TrackTimingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    private var editHint: some View {
-        Text(settings.t("Drag tiles to reorder"))
-            .font(.system(size: 10.5, weight: .regular))
-            .foregroundStyle(Color.zzTertiary)
-            .frame(maxWidth: .infinity, alignment: .leading)
+    private var overviewStatusHeader: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(connectedModuleTitle)
+                .font(.system(size: 13.5, weight: .bold))
+                .foregroundStyle(Color.zzInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            HStack(spacing: 8) {
+                Text("Bluetooth LE GPS")
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(Color.zzSecondary)
+
+                Spacer(minLength: 8)
+
+                Text(rateText)
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.zzTertiary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .zzCard(cornerRadius: 14)
+    }
+
+    private var connectedModuleTitle: String {
+        guard let module = manager.connectedModule else {
+            return settings.t("Not connected")
+        }
+        return "\(module.name) #\(module.shortID)"
+    }
+
+    private var overviewStatusRow: some View {
+        HStack(spacing: 8) {
+            if isEditing {
+                Text(settings.t("Drag tiles to reorder"))
+                    .font(.system(size: 10.5, weight: .regular))
+                    .foregroundStyle(Color.zzTertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(height: 28)
     }
 
     private var sectionBar: some View {
@@ -1523,32 +1776,12 @@ struct TrackTimingView: View {
         .frame(maxWidth: .infinity)
     }
 
+    @ViewBuilder
     private var trackToolbarContent: some View {
-        HStack(spacing: 10) {
+        if section == .dashboard {
             Text(rateText)
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Color.zzSecondary)
-
-            if section == .overview {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        isEditing.toggle()
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: isEditing ? "checkmark" : "pencil")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Color.zzInk)
-                        Text(settings.t(isEditing ? "Done" : "Edit"))
-                            .font(.system(size: 10.5, weight: .semibold))
-                            .foregroundStyle(Color.zzRed)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(Capsule().fill(Color.zzRedSoft))
-                }
-                .buttonStyle(.plain)
-            }
         }
     }
 
@@ -1708,11 +1941,205 @@ struct TrackTimingView: View {
     }
 }
 
+// MARK: - Track timing map
+
+private struct TrackTimingMapView: View {
+    @ObservedObject var manager: GPSLinkManager
+    @EnvironmentObject private var settings: AppSettings
+
+    private var speed: Double {
+        max(0, manager.trackTelemetry.speedKPH ?? 0)
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            speedCard
+
+            HStack(spacing: 12) {
+                timeCard(
+                    title: settings.t("Best result"),
+                    value: "—"
+                )
+                timeCard(
+                    title: settings.t("Last lap"),
+                    value: "—"
+                )
+            }
+
+            timeCard(
+                title: settings.t("This lap"),
+                value: "—"
+            )
+            .frame(minHeight: 92)
+
+            timeDifferenceCard
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 10)
+    }
+
+    private var speedCard: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(settings.t("Speed"))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.zzSecondary)
+                Text("km/h")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.zzTertiary)
+            }
+
+            Spacer(minLength: 8)
+
+            Text("\(Int(speed.rounded()))")
+                .font(.system(size: 46, weight: .bold, design: .monospaced))
+                .foregroundStyle(Color.zzInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, minHeight: 110)
+        .zzCard(cornerRadius: 18)
+    }
+
+    private func timeCard(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(Color.zzSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Text(value)
+                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                .foregroundStyle(Color.zzInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .zzCard(cornerRadius: 16)
+    }
+
+    private var timeDifferenceCard: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let height = proxy.size.height
+            let fillWidth: CGFloat = timeDifference.map { diff in
+                min(width * 0.5, width * CGFloat(abs(diff)) / 10)
+            } ?? 0
+
+            ZStack {
+                if let diff = timeDifference, fillWidth > 0 {
+                    Rectangle()
+                        .fill(diff >= 0 ? Color.zzRed : Color.zzGreen)
+                        .frame(width: fillWidth, height: height)
+                        .position(
+                            x: diff >= 0
+                                ? width / 2 - fillWidth / 2
+                                : width / 2 + fillWidth / 2,
+                            y: height / 2
+                        )
+                }
+
+                Text(timeDifferenceText)
+                    .font(.system(size: 42, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color.zzInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.45)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(settings.t("Time difference"))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.zzSecondary)
+                    Spacer(minLength: 0)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 92)
+        .zzCard(cornerRadius: 18)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    /// Positive means the current lap is slower than the fastest lap: the red
+    /// fill grows from the center toward the leading edge. Negative is faster:
+    /// the green fill grows from the center toward the trailing edge.
+    /// No lap-timing source yet, so no delta is available.
+    private var timeDifference: Double? {
+        nil
+    }
+
+    private var timeDifferenceText: String {
+        guard let diff = timeDifference else { return "—" }
+        return String(format: "%.2f", diff)
+    }
+
+}
+
+// MARK: - Full screen map
+
+private struct TrackFullMapView: View {
+    @ObservedObject var manager: GPSLinkManager
+
+    @State private var camera: MapCameraPosition = .automatic
+
+    private var route: [TrackRoutePoint] {
+        manager.trackTelemetry.route
+    }
+
+    var body: some View {
+        Map(position: $camera, interactionModes: [.pan, .zoom]) {
+            if route.count > 1 {
+                MapPolyline(coordinates: route.map {
+                    CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+                })
+                .stroke(
+                    Color.zzRed,
+                    style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
+                )
+            }
+
+            if let current = route.last {
+                Annotation(
+                    "",
+                    coordinate: CLLocationCoordinate2D(
+                        latitude: current.latitude,
+                        longitude: current.longitude
+                    )
+                ) {
+                    Circle()
+                        .fill(Color.zzInk)
+                        .frame(width: 12, height: 12)
+                        .overlay(Circle().stroke(Color.zzRed, lineWidth: 3))
+                        .shadow(color: .black.opacity(0.35), radius: 4)
+                }
+            }
+        }
+        .mapStyle(.standard(elevation: .flat))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.zzLine, lineWidth: 0.8)
+        )
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 10)
+    }
+}
+
 // MARK: - Track dashboard
 
 private enum TrackSection: String, CaseIterable, Identifiable {
     case overview
     case dashboard
+    case timing
+    case map
 
     var id: String { rawValue }
 
@@ -1720,6 +2147,8 @@ private enum TrackSection: String, CaseIterable, Identifiable {
         switch self {
         case .overview: return "Overview"
         case .dashboard: return "Dashboard"
+        case .timing: return "Timing"
+        case .map: return "Map"
         }
     }
 
@@ -1727,6 +2156,8 @@ private enum TrackSection: String, CaseIterable, Identifiable {
         switch self {
         case .overview: return "square.grid.2x2"
         case .dashboard: return "speedometer"
+        case .timing: return "timer"
+        case .map: return "map"
         }
     }
 }
@@ -1737,18 +2168,12 @@ private struct GForcePoint: Identifiable {
     let longitudinal: Double
 }
 
-private struct RoutePoint {
-    let latitude: Double
-    let longitude: Double
-}
-
 private struct TrackDashboardView: View {
     @ObservedObject var manager: GPSLinkManager
     @EnvironmentObject private var settings: AppSettings
 
     @State private var rangeMax: Double = 60
     @State private var points: [GForcePoint] = []
-    @State private var route: [RoutePoint] = []
     @State private var lastDate: Date?
     @State private var lastSpeedMS: Double?
     @State private var lastHeading: Double?
@@ -1828,12 +2253,6 @@ private struct TrackDashboardView: View {
                     .foregroundStyle(Color.zzSecondary)
 
                 Spacer(minLength: 6)
-
-                Text("0–\(Int(rangeMax))")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color.zzTertiary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
             }
 
             Gauge(value: speed, in: 0...rangeMax) {
@@ -1865,12 +2284,6 @@ private struct TrackDashboardView: View {
                     .foregroundStyle(Color.zzSecondary)
 
                 Spacer(minLength: 6)
-
-                Text(String(format: "%.2f / %.2f", lateralG, longitudinalG))
-                    .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color.zzTertiary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.65)
             }
 
             Chart {
@@ -1957,7 +2370,7 @@ private struct TrackDashboardView: View {
                 in: RoundedRectangle(cornerRadius: 10, style: .continuous)
             )
             .overlay {
-                if route.count < 2 {
+                if manager.trackTelemetry.route.count < 2 {
                     Text(settings.t("No route data yet"))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(Color.zzTertiary)
@@ -1980,6 +2393,7 @@ private struct TrackDashboardView: View {
     }
 
     private func drawRoute(context: inout GraphicsContext, size: CGSize) {
+        let route = manager.trackTelemetry.route
         let rect = CGRect(origin: .zero, size: size).insetBy(dx: 10, dy: 10)
         guard rect.width > 20, rect.height > 20 else { return }
 
@@ -2055,21 +2469,6 @@ private struct TrackDashboardView: View {
             }
         }
 
-        if let latitude = telemetry.latitude, let longitude = telemetry.longitude {
-            let point = RoutePoint(latitude: latitude, longitude: longitude)
-            if let last = route.last {
-                if abs(point.latitude - last.latitude) > 0.000001
-                    || abs(point.longitude - last.longitude) > 0.000001 {
-                    route.append(point)
-                }
-            } else {
-                route.append(point)
-            }
-            if route.count > 600 {
-                route.removeFirst(route.count - 600)
-            }
-        }
-
         guard let date = telemetry.date else { return }
         let speedMS = speedKPH / 3.6
         let previousDate = lastDate
@@ -2115,7 +2514,6 @@ private struct TrackDashboardView: View {
 
     private func reset() {
         points.removeAll()
-        route.removeAll()
         lastDate = nil
         lastSpeedMS = nil
         lastHeading = nil

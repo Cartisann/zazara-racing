@@ -5,7 +5,7 @@
 # Why this exists:
 # Xcode 15.2 cannot deploy to iOS 18+ devices because the required personalized
 # developer disk image is unavailable. This script builds the app for arm64
-# iOS 16.0 without Xcode's device installation step. The resulting IPA can
+# iOS 17.0 without Xcode's device installation step. The resulting IPA can
 # be signed on the Mac with Sideloadly or AltStore using a free Apple ID.
 #
 # Output: build/ZAZARA-RACING-unsigned.ipa
@@ -39,7 +39,7 @@ SDKROOT="$SDK" xcrun swiftc \
     -parse-as-library \
     -O \
     -module-name ZAZARA_RACING \
-    -target arm64-apple-ios16.0 \
+    -target arm64-apple-ios17.0 \
     -sdk "$SDK" \
     -Xlinker -syslibroot -Xlinker "$SDK" \
     -framework SwiftUI \
@@ -63,7 +63,7 @@ SDKROOT="$SDK" xcrun swiftc \
 echo "Stamping iOS 27.1 SDK version for iPhone Duo..."
 BINARY="$APP/ZAZARA_RACING"
 STAMPED="$BINARY.stamped"
-xcrun vtool     -set-build-version ios 16.0 27.1 -tool ld 1022.1 -replace \
+xcrun vtool     -set-build-version ios 17.0 27.1 -tool ld 1022.1 -replace \
     "$BINARY" -output "$STAMPED"
 mv "$STAMPED" "$BINARY"
 
@@ -146,7 +146,7 @@ cat > "$APP/Info.plist" <<'PLIST'
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>MinimumOSVersion</key>
-    <string>16.0</string>
+    <string>17.0</string>
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>ZAZARA RACING uses Bluetooth to find and link your track GPS receiver.</string>
     <key>NSBluetoothPeripheralUsageDescription</key>

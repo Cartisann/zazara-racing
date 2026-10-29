@@ -19,7 +19,7 @@
 
 - Tab 栏改为**系统原生 `TabView`**：iOS 18+ 使用 `Tab` + `.tabViewStyle(.sidebarAdaptable)`，在 Duo 内屏横屏 / iPad 等宽屏布局下由系统自动变成右侧悬浮的 Liquid Glass sidebar；普通 iPhone 竖屏是系统底部 Tab 栏
 - iOS 26+ 的玻璃材质、选中块的放大/缩小、融合/滑动过渡全部由系统绘制，不再手写玻璃效果
-- iOS 16–17 使用经典 `TabView` + `.tabItem`（系统底部 Tab 栏）
+- iOS 17 使用经典 `TabView` + `.tabItem`（系统底部 Tab 栏）
 - 页面内容的安全区由系统 TabView 自动处理；Duo 外屏 / 内屏 / 分屏切换不再需要手写断点判断
 - 当前构建使用 Xcode 27.1 / iOS 27.1 SDK；用 Xcode 15 打开时会自动走经典 Tab 栏分支
 
@@ -66,7 +66,7 @@ ZAZARA 硬件保留 RaceChrono 的 `0x1FF8` 服务，因此 RaceChrono 仍可正
 - Timing → Track 的仪表页（固定不滚动）：系统 `Gauge` + 自定义 `GaugeStyle` 的半圆速度表（初始 0–60 km/h，随速度自动扩大量程；半圆不拉伸，宽高不足时留空）、Swift Charts 的 G 值点阵图（横向/纵向 G 由 GPS 速度与方位角计算）、GPS 经纬度轨迹绘制的路程图和累计距离；G 值/路程为正方形面板，宽屏/竖屏自动切换布局
 - 主 Tab「赛道」为赛道库待上线占位页，可跳转连接 GPS 设备；实时 Track 数据和仪表从 Timing → Track 进入
 - 应用内中英文即时切换，设置本地持久化
-- 系统原生 Tab 栏：iOS 18+ 自适应 sidebar（`.sidebarAdaptable`），iOS 16–17 经典 tab bar
+- 系统原生 Tab 栏：iOS 18+ 自适应 sidebar（`.sidebarAdaptable`），iOS 17 经典 tab bar
 - iOS 26+ 使用系统 Liquid Glass 和原生选中过渡，无需自定义玻璃/动画代码
 - SwiftUI Previews 覆盖首次启动、记录、扫描、已连接、连接成功等状态
 - 深色状态栏、白色 Accent Color（红色保留为品牌、按钮和仪表/数据强调色）、蓝牙权限文案与 Sideloadly 安装脚本已配置
@@ -74,7 +74,7 @@ ZAZARA 硬件保留 RaceChrono 的 `0x1FF8` 服务，因此 RaceChrono 仍可正
 ## 运行
 
 - 使用 Xcode 16+ 打开可获得 iOS 18+ 的自适应 sidebar；Xcode 15 会使用经典 Tab 栏
-- 最低系统：iOS 16.0
+- 最低系统：iOS 17.0
 - **蓝牙 LE 在模拟器中不可用，请使用真机测试配对流程**
 - 首次点击添加 GPS 时会请求蓝牙权限
 
@@ -94,7 +94,7 @@ ZAZARA 硬件保留 RaceChrono 的 `0x1FF8` 服务，因此 RaceChrono 仍可正
 ./Scripts/make-unsigned-ipa.sh
 ```
 
-该 IPA 最低支持 iOS 16.0，使用 iOS 27.1 SDK、arm64，已做 ad-hoc 签名；Sideloadly 会使用你的免费 Apple ID 重新签名后安装。
+该 IPA 最低支持 iOS 17.0，使用 iOS 27.1 SDK、arm64，已做 ad-hoc 签名；Sideloadly 会使用你的免费 Apple ID 重新签名后安装。
 
 1. 在 Mac 安装 [Sideloadly](https://sideloadly.io)。（若捆绑 ID 冲突，在 Sideloadly 中勾选 Change Bundle ID。）
 2. 用 USB 连接 iPhone 16 Pro Max，在手机上选择“信任此电脑”。
@@ -134,7 +134,7 @@ ZAZARA 硬件保留 RaceChrono 的 `0x1FF8` 服务，因此 RaceChrono 仍可正
   - Duo 内屏横屏时，系统 `.sidebarAdaptable` 默认把主 Tab 侧栏放在左侧；仅在 Duo 内屏横屏（phone、约 1.4:1、宽 >900、高 >600）给 `TabView` 设 RTL，把侧栏放回右侧，同时各 Tab 内容强制 LTR，避免页面镜像。普通 iPhone / iPad 不触发
   - 仪表：SwiftUI `Gauge` + `GaugeStyle`；G 值点阵：Swift Charts `PointMark`
   - 蓝牙：CoreBluetooth；图标：SF Symbols；日期时间：Foundation `DateFormatter`
-  - iOS 16 的 `onChange` 兼容：`zzOnChange` 内部优先走 iOS 17 API
+  - `onChange` 兼容封装：`zzOnChange` 内部优先走 iOS 17 API
 - 保留自定义的部分是品牌/视觉设计（页面字标、卡片、按钮、赛道图形、信号格等）。添加指标弹窗、连接中遮罩目前是自定义视觉实现；若不需要特殊样式，可迁移到系统 `.sheet` / `.alert`。
 
 ## 代码结构

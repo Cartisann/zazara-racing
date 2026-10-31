@@ -39,9 +39,20 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Render stored WGS84 coordinates aligned to the Chinese GCJ-02 map.
+    /// Storage is always WGS84; this only affects map rendering.
+    @Published var alignChinaMap: Bool {
+        didSet {
+            UserDefaults.standard.set(alignChinaMap, forKey: Self.mapAlignmentKey)
+        }
+    }
+
     private static let storageKey = "zazara.appLanguage"
+    private static let mapAlignmentKey = "zazara.alignChinaMap"
 
     init(language: AppLanguage? = nil) {
+        self.alignChinaMap = UserDefaults.standard.bool(forKey: Self.mapAlignmentKey)
+
         if let language {
             self.language = language
             return
@@ -208,6 +219,8 @@ final class AppSettings: ObservableObject {
         "This run": "本轮时间",
         "Last lap": "上一圈成绩",
         "This lap": "本圈成绩",
+        "Connection": "连接",
+        "Search": "搜索",
         "Best result": "最快成绩",
         "Time difference": "时间差",
         "Map": "地图",
@@ -316,6 +329,9 @@ final class AppSettings: ObservableObject {
         // Mine
         "Language": "语言",
         "App language": "界面语言",
+        "Align to China map": "对齐中国地图",
+        "Render WGS84 tracks and routes aligned to the Chinese map (GCJ-02). Stored data stays WGS84.": "在地图上按 GCJ-02 对齐显示 WGS84 赛道和轨迹，数据仍以 WGS84 存储。",
+        "Only affects map display. Imported .rcz tracks and recorded GPS data keep their original WGS84 coordinates.": "只影响地图显示，导入的 .rcz 赛道和记录的 GPS 数据仍保留原始 WGS84 坐标。",
         "Changes apply immediately throughout the app.": "切换后立即应用到整个应用。",
         "GPS connection": "GPS 连接",
         "Account": "账户",

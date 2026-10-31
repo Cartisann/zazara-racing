@@ -142,6 +142,7 @@ final class GPSLinkManager: NSObject, ObservableObject {
     private var knownPeripherals: [UUID: CBPeripheral] = [:]
     private var pendingModule: SavedGPSModule?
     private var wantsScan = false
+    private var isDisconnecting = false
     private var isReconnectScan = false
     private var isResolvingConnection = false
     private var intentionalDisconnect = false
@@ -204,6 +205,14 @@ final class GPSLinkManager: NSObject, ObservableObject {
 
         ensureCentral()
         wantsScan = true
+
+        // Wait for didDisconnectPeripheral before scanning; the module does not
+        // re-advertise until it has fully released the previous connection.
+        if isDisconnecting {
+            isScanning = true
+            discoveredModules = []
+            return
+        }
 
         guard let state = central?.state else { return }
 
@@ -344,6 +353,7 @@ final class GPSLinkManager: NSObject, ObservableObject {
 
         clearAlert()
         intentionalDisconnect = true
+        isDisconnecting = true
         connectTimeout?.invalidate()
         connectTimeout = nil
         clearSavedAvailability()
@@ -1244,8 +1254,7 @@ extension GPSLinkManager: CBCentralManagerDelegate {
 
         isResolvingConnection = false
         isReconnectScan = false
-        isScanning = false
-        wantsScan = false
+        isDisconnecting = false
         pendingModule = nil
         identityCharacteristic = nil
         connectedMACAddress = nil
@@ -1264,6 +1273,12 @@ extension GPSLinkManager: CBCentralManagerDelegate {
 
         if wasConnected || wasConnecting {
             linkState = .idle
+        }
+
+        if wantsScan, linkState == .idle {
+            beginScan(clearResults: true)
+        } else {
+            isScanning = false
         }
 
         if !wasIntentional {

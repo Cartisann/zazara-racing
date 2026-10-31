@@ -10,6 +10,11 @@
 		AAD954583083C71100B571B3 /* ZAZARA_RACINGApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD954573083C71100B571B3 /* ZAZARA_RACINGApp.swift */; };
 		AAD9545A3083C71100B571B3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD954593083C71100B571B3 /* ContentView.swift */; };
 		AAD9545C3083C71300B571B3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AAD9545B3083C71300B571B3 /* Assets.xcassets */; };
+		BB0000000000000000000021 /* tianma_track.json in Resources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000011 /* tianma_track.json */; };
+		BB0000000000000000000022 /* taicang_track.json in Resources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000012 /* taicang_track.json */; };
+		BB0000000000000000000023 /* track_tianma_1.rcz in Resources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000013 /* track_tianma_1.rcz */; };
+		BB0000000000000000000024 /* track_taicang_1.rcz in Resources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000014 /* track_taicang_1.rcz */; };
+		CC0000000000000000000003 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = CC0000000000000000000002 /* ZIPFoundation */; };
 		AAD954603083C71300B571B3 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AAD9545F3083C71300B571B3 /* Preview Assets.xcassets */; };
 		AAD9546A3083C71300B571B3 /* ZAZARA_RACINGTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD954693083C71300B571B3 /* ZAZARA_RACINGTests.swift */; };
 		AAD954743083C71400B571B3 /* ZAZARA_RACINGUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD954733083C71400B571B3 /* ZAZARA_RACINGUITests.swift */; };
@@ -45,6 +50,10 @@
 		AAD954593083C71100B571B3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AAD9545B3083C71300B571B3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AAD9545D3083C71300B571B3 /* ZAZARA_RACING.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ZAZARA_RACING.entitlements; sourceTree = "<group>"; };
+		BB0000000000000000000011 /* tianma_track.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = tianma_track.json; sourceTree = "<group>"; };
+		BB0000000000000000000012 /* taicang_track.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = taicang_track.json; sourceTree = "<group>"; };
+		BB0000000000000000000013 /* track_tianma_1.rcz */ = {isa = PBXFileReference; lastKnownFileType = file; path = track_tianma_1.rcz; sourceTree = "<group>"; };
+		BB0000000000000000000014 /* track_taicang_1.rcz */ = {isa = PBXFileReference; lastKnownFileType = file; path = track_taicang_1.rcz; sourceTree = "<group>"; };
 		AAD9545F3083C71300B571B3 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		AAD954653083C71300B571B3 /* ZAZARA RACINGTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "ZAZARA RACINGTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AAD954693083C71300B571B3 /* ZAZARA_RACINGTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZAZARA_RACINGTests.swift; sourceTree = "<group>"; };
@@ -64,6 +73,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CC0000000000000000000003 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -117,9 +127,21 @@
 				AAD9550B3083C71100B571B3 /* Localization.swift */,
 				AAD9545B3083C71300B571B3 /* Assets.xcassets */,
 				AAD9545D3083C71300B571B3 /* ZAZARA_RACING.entitlements */,
+				BB0000000000000000000001 /* Tracks */,
 				AAD9545E3083C71300B571B3 /* Preview Content */,
 			);
 			path = "ZAZARA RACING";
+			sourceTree = "<group>";
+		};
+		BB0000000000000000000001 /* Tracks */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000011 /* tianma_track.json */,
+				BB0000000000000000000012 /* taicang_track.json */,
+				BB0000000000000000000013 /* track_tianma_1.rcz */,
+				BB0000000000000000000014 /* track_taicang_1.rcz */,
+			);
+			path = Tracks;
 			sourceTree = "<group>";
 		};
 		AAD9545E3083C71300B571B3 /* Preview Content */ = {
@@ -163,6 +185,9 @@
 			dependencies = (
 			);
 			name = "ZAZARA RACING";
+			packageProductDependencies = (
+				CC0000000000000000000002 /* ZIPFoundation */,
+			);
 			productName = "ZAZARA RACING";
 			productReference = AAD954543083C71100B571B3 /* ZAZARA RACING.app */;
 			productType = "com.apple.product-type.application";
@@ -235,6 +260,9 @@
 				Base,
 			);
 			mainGroup = AAD9544B3083C71100B571B3;
+			packageReferences = (
+				CC0000000000000000000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+			);
 			productRefGroup = AAD954553083C71100B571B3 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -253,6 +281,10 @@
 			files = (
 				AAD954603083C71300B571B3 /* Preview Assets.xcassets in Resources */,
 				AAD9545C3083C71300B571B3 /* Assets.xcassets in Resources */,
+				BB0000000000000000000021 /* tianma_track.json in Resources */,
+				BB0000000000000000000022 /* taicang_track.json in Resources */,
+				BB0000000000000000000023 /* track_tianma_1.rcz in Resources */,
+				BB0000000000000000000024 /* track_taicang_1.rcz in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -319,6 +351,25 @@
 			targetProxy = AAD954703083C71400B571B3 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		CC0000000000000000000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.19;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CC0000000000000000000002 /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CC0000000000000000000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		AAD954773083C71400B571B3 /* Debug */ = {
@@ -457,6 +508,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "ZAZARA RACING";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "ZAZARA RACING uses Bluetooth to find and link your track GPS receiver.";
 				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "ZAZARA RACING uses Bluetooth to find and link your track GPS receiver.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "ZAZARA RACING uses your location to center the track editor and maps around you.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -499,6 +551,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "ZAZARA RACING";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "ZAZARA RACING uses Bluetooth to find and link your track GPS receiver.";
 				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "ZAZARA RACING uses Bluetooth to find and link your track GPS receiver.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "ZAZARA RACING uses your location to center the track editor and maps around you.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

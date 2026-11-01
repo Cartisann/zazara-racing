@@ -24,6 +24,7 @@
 		AAD955063083C71100B571B3 /* ConnectGPSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD955053083C71100B571B3 /* ConnectGPSView.swift */; };
 		AAD955083083C71100B571B3 /* LinkedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD955073083C71100B571B3 /* LinkedView.swift */; };
 		AAD9550A3083C71100B571B3 /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD955093083C71100B571B3 /* AppShellView.swift */; };
+		AA11F1E2A3B4C5D6E7F80002 /* LapTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11F1E2A3B4C5D6E7F80001 /* LapTiming.swift */; };
 		AAD9550C3083C71100B571B3 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD9550B3083C71100B571B3 /* Localization.swift */; };
 /* End PBXBuildFile section */
 
@@ -65,6 +66,7 @@
 		AAD955053083C71100B571B3 /* ConnectGPSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectGPSView.swift; sourceTree = "<group>"; };
 		AAD955073083C71100B571B3 /* LinkedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkedView.swift; sourceTree = "<group>"; };
 		AAD955093083C71100B571B3 /* AppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellView.swift; sourceTree = "<group>"; };
+		AA11F1E2A3B4C5D6E7F80001 /* LapTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LapTiming.swift; sourceTree = "<group>"; };
 		AAD9550B3083C71100B571B3 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -124,6 +126,7 @@
 				AAD955053083C71100B571B3 /* ConnectGPSView.swift */,
 				AAD955073083C71100B571B3 /* LinkedView.swift */,
 				AAD955093083C71100B571B3 /* AppShellView.swift */,
+				AA11F1E2A3B4C5D6E7F80001 /* LapTiming.swift */,
 				AAD9550B3083C71100B571B3 /* Localization.swift */,
 				AAD9545B3083C71300B571B3 /* Assets.xcassets */,
 				AAD9545D3083C71300B571B3 /* ZAZARA_RACING.entitlements */,
@@ -315,6 +318,7 @@
 				AAD955063083C71100B571B3 /* ConnectGPSView.swift in Sources */,
 				AAD955083083C71100B571B3 /* LinkedView.swift in Sources */,
 				AAD9550A3083C71100B571B3 /* AppShellView.swift in Sources */,
+				AA11F1E2A3B4C5D6E7F80002 /* LapTiming.swift in Sources */,
 				AAD9550C3083C71100B571B3 /* Localization.swift in Sources */,
 				AAD954583083C71100B571B3 /* ZAZARA_RACINGApp.swift in Sources */,
 			);

@@ -3517,6 +3517,11 @@ private struct TrackTileDropDelegate: DropDelegate {
 
 struct TrackTimingView: View {
     @ObservedObject var manager: GPSLinkManager
+    @StateObject private var lapRecorder = LapSessionRecorder()
+    @State private var storedSession: LapSession?
+    @AppStorage("zazara.lapTrackID.v1") private var selectedTrackID = ""
+    @State private var availableTracks: [LapTrackConfig] = []
+    @State private var showTrackPicker = false
 
     @EnvironmentObject private var settings: AppSettings
     @Environment(\.dismiss) private var dismiss
@@ -3567,7 +3572,7 @@ struct TrackTimingView: View {
                     TrackDashboardView(manager: manager)
                         .tag(TrackSection.dashboard)
 
-                    TrackTimingMapView(manager: manager)
+                    TrackTimingMapView(manager: manager, recorder: lapRecorder)
                         .tag(TrackSection.timing)
 
                     TrackFullMapView(manager: manager)
@@ -3608,18 +3613,54 @@ struct TrackTimingView: View {
                     editToolbarButton
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    LapAnalysisView(session: analysisSession)
+                } label: {
+                    Image(systemName: "chart.xyaxis.line")
+                }
+                .accessibilityLabel(settings.t("Details"))
+            }
+            #endif
+            #if os(macOS)
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
+                    LapAnalysisView(session: analysisSession)
+                } label: {
+                    Image(systemName: "chart.xyaxis.line")
+                }
+                .accessibilityLabel(settings.t("Details"))
+            }
             #endif
         }
         #if os(iOS)
         .toolbar(.hidden, for: .tabBar)
         #endif
+        .safeAreaInset(edge: .top, spacing: 0) {
+            trackSelectionBanner
+        }
+        .sheet(isPresented: $showTrackPicker) {
+            TrackSelectionSheet(
+                tracks: availableTracks,
+                selectedTrackID: $selectedTrackID
+            )
+        }
         .onAppear {
             normalizeOrder()
+            storedSession = LapSessionStore.loadLatest()
+            availableTracks = loadAvailableTracks()
+            if let track = selectedTrack, !lapRecorder.isRecording {
+                lapRecorder.start(track: track)
+            }
             #if os(iOS)
             UIApplication.shared.isIdleTimerDisabled = true
             #endif
         }
         .onDisappear {
+            lapRecorder.stop()
+            if let session = lapRecorder.session, !session.laps.isEmpty {
+                storedSession = session
+            }
             #if os(iOS)
             UIApplication.shared.isIdleTimerDisabled = false
             #endif
@@ -3627,9 +3668,100 @@ struct TrackTimingView: View {
         .zzOnChange(of: order) { newOrder in
             orderRaw = newOrder.joined(separator: ",")
         }
+        .zzOnChange(of: manager.trackTelemetry) { telemetry in
+            lapRecorder.ingest(telemetry)
+        }
+        .zzOnChange(of: selectedTrackID) { _ in
+            restartTimingForSelection()
+        }
     }
 
 
+
+    private var detailsSession: LapSession? {
+        if let session = lapRecorder.session, !session.laps.isEmpty { return session }
+        if let storedSession, !storedSession.laps.isEmpty { return storedSession }
+        return nil
+    }
+
+    private var analysisSession: LapSession {
+        if let session = detailsSession { return session }
+        return LapSession(
+            id: UUID(),
+            trackID: lapRecorder.track?.trackID ?? "",
+            trackName: lapRecorder.track?.name ?? "",
+            startedAt: Date(),
+            endedAt: nil,
+            laps: []
+        )
+    }
+
+    private var selectedTrack: LapTrackConfig? {
+        availableTracks.first { $0.trackID == selectedTrackID }
+    }
+
+    private func loadAvailableTracks() -> [LapTrackConfig] {
+        TrackStore.load().compactMap { track in
+            LapTrackConfig.load(jsonData: track.jsonData, name: track.name, trackID: track.id)
+        }
+    }
+
+    private func restartTimingForSelection() {
+        if lapRecorder.isRecording {
+            lapRecorder.stop()
+        }
+        if let session = lapRecorder.session, !session.laps.isEmpty {
+            storedSession = session
+        }
+        guard let track = selectedTrack else { return }
+        lapRecorder.start(track: track)
+    }
+
+    private var trackSelectionBanner: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: selectedTrack == nil ? "flag" : "flag.checkered")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.white)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(selectedTrack == nil ? settings.t("Please select a timing track") : settings.t("Timing track"))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.white)
+                        .lineLimit(1)
+                    if let selectedTrack {
+                        Text(selectedTrack.name)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.78))
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            Button {
+                showTrackPicker = true
+            } label: {
+                Text(selectedTrack == nil ? settings.t("Select track") : settings.t("Change"))
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(selectedTrack == nil ? Color.zzRed : Color.zzInk)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(Capsule().fill(selectedTrack == nil ? Color.white : Color.zzMutedSurface))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(selectedTrack == nil ? Color.zzRed : Color.zzSurface)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.zzLine.opacity(0.6))
+                .frame(height: 0.5)
+        }
+    }
 
     private var rateText: String {
         let rate = manager.trackTelemetry.updateRateHz
@@ -3981,8 +4113,89 @@ struct TrackTimingView: View {
 
 // MARK: - Track timing map
 
+private struct TrackSelectionSheet: View {
+    let tracks: [LapTrackConfig]
+    @Binding var selectedTrackID: String
+    @EnvironmentObject private var settings: AppSettings
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+
+    private var filteredTracks: [LapTrackConfig] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return tracks }
+        return tracks.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if tracks.isEmpty {
+                    Text(settings.t("No track with timing points"))
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.zzSecondary)
+                        .listRowBackground(Color.clear)
+                } else if filteredTracks.isEmpty {
+                    Text(settings.t("No matching tracks"))
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.zzSecondary)
+                        .listRowBackground(Color.clear)
+                } else {
+                    ForEach(filteredTracks) { track in
+                        Button {
+                            selectedTrackID = track.trackID
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "flag.checkered")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Color.zzSecondary)
+                                Text(track.name)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(Color.zzInk)
+                                Spacer(minLength: 8)
+                                if track.trackID == selectedTrackID {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color.zzGreen)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                        .listRowBackground(Color.zzSurface)
+                    }
+
+                    if !selectedTrackID.isEmpty {
+                        Button(role: .destructive) {
+                            selectedTrackID = ""
+                            dismiss()
+                        } label: {
+                            Label(settings.t("Clear track selection"), systemImage: "xmark")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .listRowBackground(Color.zzSurface)
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color.zzCanvas)
+            .searchable(text: $query, prompt: Text(settings.t("Filter tracks")))
+            .navigationTitle(settings.t("Select timing track"))
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(settings.t("Cancel")) { dismiss() }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
 private struct TrackTimingMapView: View {
     @ObservedObject var manager: GPSLinkManager
+    @ObservedObject var recorder: LapSessionRecorder
     @EnvironmentObject private var settings: AppSettings
 
     private var speed: Double {
@@ -3996,17 +4209,17 @@ private struct TrackTimingMapView: View {
             HStack(spacing: 12) {
                 timeCard(
                     title: settings.t("Best result"),
-                    value: "—"
+                    value: recorder.bestLapText
                 )
                 timeCard(
                     title: settings.t("Last lap"),
-                    value: "—"
+                    value: recorder.lastLapText
                 )
             }
 
             timeCard(
                 title: settings.t("This lap"),
-                value: "—"
+                value: recorder.currentLapText
             )
             .frame(minHeight: 92)
 
@@ -4110,12 +4323,12 @@ private struct TrackTimingMapView: View {
     /// the green fill grows from the center toward the trailing edge.
     /// No lap-timing source yet, so no delta is available.
     private var timeDifference: Double? {
-        nil
+        recorder.timeDifference
     }
 
     private var timeDifferenceText: String {
         guard let diff = timeDifference else { return "—" }
-        return String(format: "%.2f", diff)
+        return String(format: "%+.2f", diff)
     }
 
 }

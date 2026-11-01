@@ -7,6 +7,7 @@
 
 import Combine
 import CoreBluetooth
+import CoreLocation
 import Foundation
 
 // MARK: - Models
@@ -95,10 +96,11 @@ struct TrackTelemetry: Equatable {
 
 // MARK: - Manager
 
-final class GPSLinkManager: NSObject, ObservableObject {
+final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     // MARK: Published state
 
     @Published private(set) var linkState: GPSLinkState = .idle
+    @Published private(set) var isUsingBuiltInGPS = false
     @Published private(set) var bluetoothState: CBManagerState = .unknown
     @Published private(set) var authorization: CBManagerAuthorization = .notDetermined
     @Published private(set) var isScanning = false
@@ -152,6 +154,7 @@ final class GPSLinkManager: NSObject, ObservableObject {
     private var savedAvailabilityExpiry: [UUID: DispatchWorkItem] = [:]
 
     private let defaults: UserDefaults
+    private let phoneLocationManager = CLLocationManager()
     private let persistenceKey = "zazara.savedGPSModules.v1"
     private let maximumSavedModules = 12
     private let batteryServiceUUID = CBUUID(string: "180F")
@@ -186,6 +189,9 @@ final class GPSLinkManager: NSObject, ObservableObject {
     override init() {
         defaults = .standard
         super.init()
+        phoneLocationManager.delegate = self
+        phoneLocationManager.desiredAccuracy = kCLLocationAccuracyBest
+        phoneLocationManager.distanceFilter = 1
         loadSavedModules()
     }
 
@@ -898,6 +904,109 @@ final class GPSLinkManager: NSObject, ObservableObject {
         if now.timeIntervalSince(lastTelemetryPublish) >= 0.2 {
             trackTelemetry = telemetry
             lastTelemetryPublish = now
+        }
+    }
+
+
+    // MARK: Built-in GPS
+
+    func setBuiltInGPS(_ enabled: Bool) {
+        guard enabled != isUsingBuiltInGPS else { return }
+
+        if enabled {
+            disconnect()
+            stopScan()
+            isUsingBuiltInGPS = true
+            resetTrackTelemetry(startSession: true)
+            if phoneLocationManager.authorizationStatus == .notDetermined {
+                phoneLocationManager.requestWhenInUseAuthorization()
+            }
+            phoneLocationManager.startUpdatingLocation()
+        } else {
+            isUsingBuiltInGPS = false
+            phoneLocationManager.stopUpdatingLocation()
+            resetTrackTelemetry()
+        }
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard manager === phoneLocationManager, isUsingBuiltInGPS else { return }
+        switch manager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            manager.startUpdatingLocation()
+        default:
+            break
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard manager === phoneLocationManager, isUsingBuiltInGPS, let location = locations.last else { return }
+        ingestBuiltInLocation(location)
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {}
+
+    private func ingestBuiltInLocation(_ location: CLLocation) {
+        let now = location.timestamp
+        var telemetry = TrackTelemetry()
+        telemetry.date = now
+        telemetry.fix = 2
+        telemetry.latitude = location.coordinate.latitude
+        telemetry.longitude = location.coordinate.longitude
+        telemetry.speedKPH = max(0, location.speed) * 3.6
+        telemetry.heading = location.course >= 0 ? location.course : nil
+        telemetry.altitude = location.verticalAccuracy > 0 ? location.altitude : nil
+
+        if let previous = lastGPSFix {
+            let segment = Self.distanceMeters(
+                from: previous,
+                to: (location.coordinate.latitude, location.coordinate.longitude)
+            )
+            if segment.isFinite, segment > 0.25, segment < 1_000 {
+                trackDistanceMeters += segment
+                trackRoute.append(TrackRoutePoint(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude))
+            }
+        } else {
+            trackRoute.append(TrackRoutePoint(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude))
+        }
+        if trackRoute.count > 600 {
+            trackRoute.removeFirst(trackRoute.count - 600)
+        }
+        lastGPSFix = (location.coordinate.latitude, location.coordinate.longitude)
+        telemetry.distanceKm = trackDistanceMeters / 1000
+        telemetry.route = trackRoute
+
+        if trackSessionStart == nil {
+            trackSessionStart = now
+        }
+        telemetry.elapsed = trackSessionStart.map { now.timeIntervalSince($0) } ?? 0
+
+        if let windowStart = rateWindowStart {
+            let interval = now.timeIntervalSince(windowStart)
+            if interval < 0 || interval > 2 {
+                rateWindowStart = now
+                rateWindowCount = 0
+                telemetry.updateRateHz = 0
+            } else if interval >= 1 {
+                rateWindowCount += 1
+                telemetry.updateRateHz = Double(rateWindowCount) / interval
+                rateWindowStart = now
+                rateWindowCount = 0
+            } else {
+                if interval > 0 { rateWindowCount += 1 }
+                telemetry.updateRateHz = pendingTelemetry.updateRateHz
+            }
+        } else {
+            rateWindowStart = now
+            rateWindowCount = 0
+            telemetry.updateRateHz = 0
+        }
+
+        pendingTelemetry = telemetry
+        let publishInterval = Date().timeIntervalSince(lastTelemetryPublish)
+        if publishInterval >= 0.2 || publishInterval < 0 {
+            trackTelemetry = telemetry
+            lastTelemetryPublish = Date()
         }
     }
 

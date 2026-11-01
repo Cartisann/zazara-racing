@@ -154,6 +154,9 @@ final class AppSettings: ObservableObject {
     }
 
     static func localizedStatus(for manager: GPSLinkManager, language: AppLanguage) -> (text: String, color: Color) {
+        if manager.isUsingBuiltInGPS {
+            return (L10n.text("Built-in GPS", language: language), .zzGreen)
+        }
         if manager.isConnected {
             return (L10n.text("Connected", language: language), .zzGreen)
         }
@@ -189,6 +192,21 @@ final class AppSettings: ObservableObject {
         "DRAG": "直线",
         "TRACK": "赛道",
         "DEVICES": "设备",
+        "Use built-in GPS": "使用内置 GPS",
+        "Uses the iPhone's location instead of a Bluetooth GPS": "使用手机定位，替代蓝牙 GPS",
+        "Bluetooth GPS": "蓝牙 GPS",
+        "Bluetooth GPS device": "蓝牙 GPS 设备",
+        "Connect and manage Bluetooth GPS modules": "连接和管理蓝牙 GPS 模块",
+        "Use built-in camera": "使用内置摄像头",
+        "Uses the iPhone's camera for video recording": "使用手机内置摄像头录像",
+        "Camera device": "摄像头设备",
+        "Connect an external camera to see it here": "连接外接摄像头后会显示在这里",
+        "Built-in GPS": "内置 GPS",
+        "Built-in camera": "内置摄像头",
+        "Built-in": "内置",
+        "External camera": "外接摄像头",
+        "No camera": "未连接摄像头",
+        "Camera recording is coming soon": "录像功能开发中",
         "MORE": "更多",
         "TIMING": "计时",
         "LAPS": "圈速",

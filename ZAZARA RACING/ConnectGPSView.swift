@@ -909,3 +909,249 @@ private struct ZZSwipeToDelete<Content: View>: View {
     .environmentObject(AppSettings(language: .chinese))
 }
 #endif
+
+// MARK: - Devices root
+
+/// Root of the Devices tab: lets the user choose between the Bluetooth
+/// hardware and the iPhone's built-in sensors before entering the
+/// corresponding second-level page.
+struct DevicesRootView: View {
+    @ObservedObject var manager: GPSLinkManager
+    @EnvironmentObject private var settings: AppSettings
+    @AppStorage("zazara.useBuiltInGPS") private var useBuiltInGPS = false
+    @AppStorage("zazara.useBuiltInCamera") private var useBuiltInCamera = false
+
+    var body: some View {
+        ZStack {
+            Color.zzCanvas.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                ZZScreenHeader(
+                    title: settings.t("Devices"),
+                    statusText: manager.zzStatus(language: settings.language).text,
+                    statusColor: manager.zzStatus(language: settings.language).color
+                )
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        gpsSection
+                        cameraSection
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: 720)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+        .preferredColorScheme(.dark)
+        #if os(iOS)
+        .toolbar(.hidden, for: .navigationBar)
+        #endif
+        .onAppear {
+            manager.setBuiltInGPS(useBuiltInGPS)
+        }
+        .zzOnChange(of: useBuiltInGPS) { enabled in
+            manager.setBuiltInGPS(enabled)
+        }
+    }
+
+    private var gpsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle(settings.t("GPS"))
+
+            VStack(spacing: 0) {
+                Toggle(isOn: $useBuiltInGPS) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(settings.t("Use built-in GPS"))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.zzInk)
+                        Text(settings.t("Uses the iPhone's location instead of a Bluetooth GPS"))
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.zzSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .tint(Color.zzRed)
+                .padding(14)
+
+                Divider().overlay(Color.zzLine)
+
+                NavigationLink {
+                    DevicesView(manager: manager)
+                } label: {
+                    deviceRow(
+                        icon: "antenna.radiowaves.left.and.right",
+                        title: settings.t("Bluetooth GPS device"),
+                        detail: settings.t("Connect and manage Bluetooth GPS modules"),
+                        enabled: !useBuiltInGPS
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(useBuiltInGPS)
+            }
+            .background(Color.zzSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color.zzLine, lineWidth: 0.5)
+            )
+        }
+    }
+
+    private var cameraSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle(settings.t("Camera"))
+
+            VStack(spacing: 0) {
+                Toggle(isOn: $useBuiltInCamera) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(settings.t("Use built-in camera"))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.zzInk)
+                        Text(settings.t("Uses the iPhone's camera for video recording"))
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.zzSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .tint(Color.zzRed)
+                .padding(14)
+
+                Divider().overlay(Color.zzLine)
+
+                NavigationLink {
+                    CameraDevicesView()
+                } label: {
+                    deviceRow(
+                        icon: "camera",
+                        title: settings.t("Camera device"),
+                        detail: settings.t("Connect an external camera to see it here"),
+                        enabled: !useBuiltInCamera
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(useBuiltInCamera)
+            }
+            .background(Color.zzSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color.zzLine, lineWidth: 0.5)
+            )
+        }
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Color.zzTertiary)
+            .padding(.leading, 4)
+    }
+
+    private func deviceRow(icon: String, title: String, detail: String, enabled: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.zzSecondary)
+                .frame(width: 22)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.zzInk)
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.zzSecondary)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color.zzTertiary)
+        }
+        .padding(14)
+        .contentShape(Rectangle())
+        .opacity(enabled ? 1 : 0.35)
+    }
+}
+
+// MARK: - Camera devices
+
+struct CameraDevicesView: View {
+    @EnvironmentObject private var settings: AppSettings
+    @AppStorage("zazara.useBuiltInCamera") private var useBuiltInCamera = false
+
+    var body: some View {
+        ZStack {
+            Color.zzCanvas.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                ZZScreenHeader(
+                    title: settings.t("Camera"),
+                    statusText: useBuiltInCamera ? settings.t("Built-in camera") : settings.t("No camera"),
+                    statusColor: useBuiltInCamera ? Color.zzGreen : Color.zzTertiary
+                )
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        cameraCard(
+                            title: settings.t("Built-in camera"),
+                            detail: settings.t("Uses the iPhone's camera for video recording"),
+                            active: useBuiltInCamera
+                        )
+                        cameraCard(
+                            title: settings.t("External camera"),
+                            detail: settings.t("Connect an external camera to see it here"),
+                            active: false
+                        )
+
+                        Text(settings.t("Camera recording is coming soon"))
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.zzTertiary)
+                            .padding(.leading, 4)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: 720)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func cameraCard(title: String, detail: String, active: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: active ? "camera.fill" : "camera")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(active ? Color.zzRed : Color.zzTertiary)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.zzInk)
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.zzSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            Text(active ? settings.t("Built-in camera") : settings.t("Not connected"))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(active ? Color.zzGreen : Color.zzTertiary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.zzSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.zzLine, lineWidth: 0.5)
+        )
+    }
+}

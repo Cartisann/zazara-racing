@@ -622,6 +622,7 @@ enum LapMetric: String, CaseIterable, Identifiable {
 
 struct LapAnalysisView: View {
     let session: LapSession
+    var autoPlay: Bool = true
     @EnvironmentObject private var settings: AppSettings
     @State private var metric: LapMetric = .speed
 
@@ -773,7 +774,7 @@ struct LapAnalysisView: View {
 
     private func lapLink(_ lap: LapRecord, compact: Bool) -> some View {
         NavigationLink {
-            LapTimelineView(lap: lap, bestLap: session.bestLap)
+            LapTimelineView(lap: lap, bestLap: session.bestLap, autoPlay: autoPlay)
         } label: {
             HStack(spacing: 10) {
                 Text(verbatim: "\(lap.id)")
@@ -987,7 +988,7 @@ struct LapHistoryView: View {
                 } else {
                     ForEach(sessions) { session in
                         NavigationLink {
-                            LapAnalysisView(session: session)
+                            LapAnalysisView(session: session, autoPlay: false)
                         } label: {
                             historyRow(session)
                         }
@@ -1078,6 +1079,7 @@ struct LapHistoryView: View {
 struct LapTimelineView: View {
     let lap: LapRecord
     let bestLap: LapRecord?
+    var autoPlay: Bool = true
 
     @EnvironmentObject private var settings: AppSettings
     @State private var isPlaying = false
@@ -1179,7 +1181,7 @@ struct LapTimelineView: View {
         }
         .onAppear {
             currentTime = 0
-            isPlaying = true
+            isPlaying = autoPlay
             #if os(iOS)
             UIApplication.shared.isIdleTimerDisabled = true
             #endif

@@ -200,6 +200,9 @@ struct AppShellView: View {
                 manager.stopScan()
             }
         }
+        .onAppear {
+            manager.setBuiltInGPS(UserDefaults.standard.bool(forKey: "zazara.useBuiltInGPS"))
+        }
     }
 
     /// Native system tab bar. On iOS 18+ the tab bar adapts to a sidebar on
@@ -234,8 +237,7 @@ struct AppShellView: View {
                     }
 
                     Tab(value: AppTab.devices) {
-                        DevicesView(manager: manager)
-                            .environment(\.layoutDirection, .leftToRight)
+                        devicesTab
                     } label: {
                         tabLabel(.devices)
                     }
@@ -261,6 +263,13 @@ struct AppShellView: View {
         #endif
     }
 
+    private var devicesTab: some View {
+        NavigationStack {
+            DevicesRootView(manager: manager)
+        }
+        .environment(\.layoutDirection, .leftToRight)
+    }
+
     private var lapsTab: some View {
         NavigationStack {
             LapHistoryView()
@@ -282,7 +291,7 @@ struct AppShellView: View {
                 .tabItem { tabLabel(.track) }
                 .tag(AppTab.track)
 
-            DevicesView(manager: manager)
+            devicesTab
                 .tabItem { tabLabel(.devices) }
                 .tag(AppTab.devices)
 
@@ -424,6 +433,18 @@ struct DragView: View {
     }
 
     private var timingDeviceStatuses: [TimingDeviceStatus] {
+        if manager.isUsingBuiltInGPS {
+            return [
+                TimingDeviceStatus(
+                    id: UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID(),
+                    name: settings.t("Built-in GPS"),
+                    kind: .gps,
+                    signalLevel: 3,
+                    connectionType: settings.t("Built-in"),
+                    shortID: "iOS"
+                )
+            ]
+        }
         guard manager.isConnected, let module = manager.connectedModule else {
             return []
         }
@@ -3539,7 +3560,6 @@ private struct TrackTileDropDelegate: DropDelegate {
 struct TrackTimingView: View {
     @ObservedObject var manager: GPSLinkManager
     @StateObject private var lapRecorder = LapSessionRecorder()
-    @State private var storedSession: LapSession?
     @State private var selectedTrackID = ""
     @State private var availableTracks: [LapTrackConfig] = []
     @State private var showTrackPicker = false
@@ -3675,7 +3695,6 @@ struct TrackTimingView: View {
         }
         .onAppear {
             normalizeOrder()
-            storedSession = LapSessionStore.loadLatest()
             availableTracks = loadAvailableTracks()
             if let track = selectedTrack, !lapRecorder.isRecording {
                 lapRecorder.start(track: track)
@@ -3687,9 +3706,6 @@ struct TrackTimingView: View {
         .onDisappear {
             if lapRecorder.isRecording {
                 lapRecorder.stop()
-            }
-            if let session = lapRecorder.session, !session.laps.isEmpty {
-                storedSession = session
             }
             #if os(iOS)
             UIApplication.shared.isIdleTimerDisabled = false
@@ -3708,14 +3724,10 @@ struct TrackTimingView: View {
 
 
 
-    private var detailsSession: LapSession? {
-        if let session = lapRecorder.session, !session.laps.isEmpty { return session }
-        if let storedSession, !storedSession.laps.isEmpty { return storedSession }
-        return nil
-    }
-
     private var analysisSession: LapSession {
-        if let session = detailsSession { return session }
+        if let session = lapRecorder.session, !session.laps.isEmpty {
+            return session
+        }
         return LapSession(
             id: UUID(),
             trackID: lapRecorder.track?.trackID ?? "",
@@ -3725,7 +3737,6 @@ struct TrackTimingView: View {
             laps: []
         )
     }
-
     private var selectedTrack: LapTrackConfig? {
         availableTracks.first { $0.trackID == selectedTrackID }
     }
@@ -3740,9 +3751,6 @@ struct TrackTimingView: View {
         if lapRecorder.isRecording {
             lapRecorder.stop()
         }
-        if let session = lapRecorder.session, !session.laps.isEmpty {
-            storedSession = session
-        }
         guard let track = selectedTrack else { return }
         lapRecorder.start(track: track)
     }
@@ -3750,9 +3758,6 @@ struct TrackTimingView: View {
     private func endSession() {
         if lapRecorder.isRecording {
             lapRecorder.stop()
-        }
-        if let session = lapRecorder.session, !session.laps.isEmpty {
-            storedSession = session
         }
         selectedTrackID = ""
         dismiss()

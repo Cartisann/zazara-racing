@@ -19,6 +19,7 @@ import UIKit
 
 enum AppTab: String, CaseIterable, Identifiable {
     case drag
+    case laps
     case track
     case devices
     case more
@@ -28,6 +29,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     var localizationKey: String {
         switch self {
         case .drag: return "TIMING"
+        case .laps: return "LAPS"
         case .track: return "TRACK"
         case .devices: return "DEVICES"
         case .more: return "MINE"
@@ -37,6 +39,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .drag: return "TIMING"
+        case .laps: return "LAPS"
         case .track: return "TRACK"
         case .devices: return "DEVICES"
         case .more: return "MINE"
@@ -45,7 +48,8 @@ enum AppTab: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .drag: return "speedometer"
+        case .drag: return "flag.checkered"
+        case .laps: return "speedometer"
         case .track: return "map"
         case .devices: return "antenna.radiowaves.left.and.right"
         case .more: return "person"
@@ -216,6 +220,12 @@ struct AppShellView: View {
                         tabLabel(.drag)
                     }
 
+                    Tab(value: AppTab.laps) {
+                        lapsTab
+                    } label: {
+                        tabLabel(.laps)
+                    }
+
                     Tab(value: AppTab.track) {
                         trackTab
                             .environment(\.layoutDirection, .leftToRight)
@@ -251,11 +261,22 @@ struct AppShellView: View {
         #endif
     }
 
+    private var lapsTab: some View {
+        NavigationStack {
+            LapHistoryView()
+        }
+        .environment(\.layoutDirection, .leftToRight)
+    }
+
     private var legacyTabView: some View {
         TabView(selection: $selectedTab) {
             dragTab
                 .tabItem { tabLabel(.drag) }
                 .tag(AppTab.drag)
+
+            lapsTab
+                .tabItem { tabLabel(.laps) }
+                .tag(AppTab.laps)
 
             trackTab
                 .tabItem { tabLabel(.track) }
@@ -387,7 +408,7 @@ struct DragView: View {
 
                     TimingModeCard(
                         kind: .track,
-                        title: settings.t("Track"),
+                        title: settings.t("Track timing"),
                         onTap: openTrackTiming
                     )
                 }
@@ -3519,7 +3540,7 @@ struct TrackTimingView: View {
     @ObservedObject var manager: GPSLinkManager
     @StateObject private var lapRecorder = LapSessionRecorder()
     @State private var storedSession: LapSession?
-    @AppStorage("zazara.lapTrackID.v1") private var selectedTrackID = ""
+    @State private var selectedTrackID = ""
     @State private var availableTracks: [LapTrackConfig] = []
     @State private var showTrackPicker = false
 
@@ -3602,11 +3623,18 @@ struct TrackTimingView: View {
         .navigationTitle(settings.t(section.titleKey))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         #endif
         .toolbar {
             #if os(iOS)
             ToolbarItemGroup(placement: .bottomBar) {
                 sectionToolbarButtons
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                endToolbarButton
+            }
+            if #available(iOS 26.0, *) {
+                ToolbarSpacer(.fixed, placement: .topBarTrailing)
             }
             if section == .overview {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -3657,7 +3685,9 @@ struct TrackTimingView: View {
             #endif
         }
         .onDisappear {
-            lapRecorder.stop()
+            if lapRecorder.isRecording {
+                lapRecorder.stop()
+            }
             if let session = lapRecorder.session, !session.laps.isEmpty {
                 storedSession = session
             }
@@ -3717,6 +3747,17 @@ struct TrackTimingView: View {
         lapRecorder.start(track: track)
     }
 
+    private func endSession() {
+        if lapRecorder.isRecording {
+            lapRecorder.stop()
+        }
+        if let session = lapRecorder.session, !session.laps.isEmpty {
+            storedSession = session
+        }
+        selectedTrackID = ""
+        dismiss()
+    }
+
     private var trackSelectionBanner: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
@@ -3753,7 +3794,8 @@ struct TrackTimingView: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.top, 10)
+        .padding(.bottom, 2)
         .frame(maxWidth: .infinity)
         .background(selectedTrack == nil ? Color.zzRed : Color.zzSurface)
         .overlay(alignment: .bottom) {
@@ -3884,6 +3926,16 @@ struct TrackTimingView: View {
     }
 
     #if os(iOS)
+    private var endToolbarButton: some View {
+        Button {
+            endSession()
+        } label: {
+            Image(systemName: "stop.fill")
+        }
+        .tint(Color.zzRed)
+        .accessibilityLabel(settings.t("End"))
+    }
+
     @ViewBuilder
     private var sectionToolbarButtons: some View {
         ForEach(TrackSection.allCases) { item in

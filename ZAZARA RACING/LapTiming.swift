@@ -77,7 +77,7 @@ struct LapRecord: Identifiable, Codable, Equatable {
     }
 }
 
-struct LapSession: Codable, Equatable {
+struct LapSession: Codable, Equatable, Identifiable {
     var id: UUID
     var trackID: String
     var trackName: String
@@ -218,29 +218,78 @@ struct LapCrossingDetector {
 // MARK: - Session store
 
 enum LapSessionStore {
-    private static var directory: URL {
+    private static var rootDirectory: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return base.appendingPathComponent("ZAZARALapSessions", isDirectory: true)
     }
 
-    private static var fileURL: URL {
-        directory.appendingPathComponent("latest.json")
+    private static var sessionsDirectory: URL {
+        rootDirectory.appendingPathComponent("sessions", isDirectory: true)
     }
 
-    static func loadLatest() -> LapSession? {
-        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+    private static var latestURL: URL {
+        rootDirectory.appendingPathComponent("latest.json")
+    }
+
+    private static func decode(_ url: URL) -> LapSession? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try? decoder.decode(LapSession.self, from: data)
     }
 
-    static func save(_ session: LapSession) {
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    private static func encode(_ session: LapSession) -> Data? {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        guard let data = try? encoder.encode(session) else { return }
-        try? data.write(to: fileURL, options: .atomic)
+        return try? encoder.encode(session)
+    }
+
+    static func loadLatest() -> LapSession? {
+        migrateIfNeeded()
+        return decode(latestURL) ?? allSessions().first
+    }
+
+    static func save(_ session: LapSession) {
+        try? FileManager.default.createDirectory(at: sessionsDirectory, withIntermediateDirectories: true)
+        guard let data = encode(session) else { return }
+        try? data.write(to: sessionURL(session), options: .atomic)
+        try? data.write(to: latestURL, options: .atomic)
+    }
+
+    static func allSessions() -> [LapSession] {
+        migrateIfNeeded()
+        var sessions: [UUID: LapSession] = [:]
+        if let latest = decode(latestURL) {
+            sessions[latest.id] = latest
+        }
+        if let files = try? FileManager.default.contentsOfDirectory(
+            at: sessionsDirectory,
+            includingPropertiesForKeys: nil
+        ) {
+            for file in files where file.pathExtension == "json" {
+                if let session = decode(file) {
+                    sessions[session.id] = session
+                }
+            }
+        }
+        return sessions.values.sorted { $0.startedAt > $1.startedAt }
+    }
+
+    private static func sessionURL(_ session: LapSession) -> URL {
+        sessionsDirectory.appendingPathComponent("\(session.id.uuidString).json")
+    }
+
+    /// The first version kept only latest.json. Copy it into the sessions
+    /// folder so history starts with the previously recorded session.
+    private static func migrateIfNeeded() {
+        try? FileManager.default.createDirectory(at: sessionsDirectory, withIntermediateDirectories: true)
+        guard let latest = decode(latestURL) else { return }
+        let destination = sessionURL(latest)
+        guard !FileManager.default.fileExists(atPath: destination.path) else { return }
+        if let data = encode(latest) {
+            try? data.write(to: destination, options: .atomic)
+        }
     }
 }
 
@@ -907,6 +956,120 @@ struct LapAnalysisView: View {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+// MARK: - History page
+
+struct LapHistoryView: View {
+    @EnvironmentObject private var settings: AppSettings
+    @State private var sessions: [LapSession] = []
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 10) {
+                if sessions.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "flag.checkered")
+                            .font(.system(size: 32, weight: .semibold))
+                            .foregroundStyle(Color.zzTertiary)
+                        Text(settings.t("No lap records yet"))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.zzInk)
+                        Text(settings.t("Finished laps are saved here automatically"))
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.zzSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 120)
+                    .padding(.horizontal, 24)
+                } else {
+                    ForEach(sessions) { session in
+                        NavigationLink {
+                            LapAnalysisView(session: session)
+                        } label: {
+                            historyRow(session)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(16)
+        }
+        .scrollIndicators(.hidden)
+        .background(Color.zzCanvas.ignoresSafeArea())
+        .navigationTitle(settings.t("Lap records"))
+        .onAppear { refresh() }
+        .refreshable { refresh() }
+    }
+
+    private func refresh() {
+        sessions = LapSessionStore.allSessions()
+    }
+
+    private func historyRow(_ session: LapSession) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(session.trackName.isEmpty ? settings.t("Track") : session.trackName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.zzInk)
+                        .lineLimit(1)
+                    Text(Self.dateText(session.startedAt, settings: settings))
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.zzTertiary)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.zzTertiary)
+            }
+
+            HStack(spacing: 8) {
+                historyChip(settings.t("Laps"), "\(session.laps.count)", color: Color.zzInk)
+                historyChip(
+                    settings.t("Best lap"),
+                    session.bestLap.map { LapSessionRecorder.formatLapTime($0.duration) } ?? "—",
+                    color: Color.zzGreen
+                )
+                historyChip(
+                    settings.t("Total"),
+                    String(format: "%.2f km", session.totalDistanceKm),
+                    color: Color.zzInk
+                )
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .zzCard(cornerRadius: 16)
+    }
+
+    private func historyChip(_ title: String, _ value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(Color.zzTertiary)
+                .lineLimit(1)
+            Text(value)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.zzMutedSurface.opacity(0.6), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+
+    private static func dateText(_ date: Date, settings: AppSettings) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: settings.language == .chinese ? "zh_CN" : "en_US")
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }
 

@@ -231,8 +231,7 @@ struct AppShellView: View {
                     }
 
                     Tab(value: AppTab.more) {
-                        MoreView(manager: manager)
-                            .environment(\.layoutDirection, .leftToRight)
+                        moreTab
                     } label: {
                         tabLabel(.more)
                     }
@@ -266,7 +265,7 @@ struct AppShellView: View {
                 .tabItem { tabLabel(.devices) }
                 .tag(AppTab.devices)
 
-            MoreView(manager: manager)
+            moreTab
                 .tabItem { tabLabel(.more) }
                 .tag(AppTab.more)
         }
@@ -298,6 +297,16 @@ struct AppShellView: View {
                 selectedTab = .devices
             }
         }
+    }
+
+    private var moreTab: some View {
+        NavigationStack {
+            MoreView(manager: manager)
+                #if os(iOS)
+                .toolbar(.hidden, for: .navigationBar)
+                #endif
+        }
+        .environment(\.layoutDirection, .leftToRight)
     }
 
     private var dragView: some View {
@@ -2251,7 +2260,6 @@ private struct ZZComingSoonCard: View {
 struct MoreView: View {
     @ObservedObject var manager: GPSLinkManager
     @EnvironmentObject private var settings: AppSettings
-    @State private var showClearConfirmation = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -2264,7 +2272,7 @@ struct MoreView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     accountSection
-                    settingsSection
+                    settingsEntry
                     aboutSection
                     footer
                 }
@@ -2278,18 +2286,6 @@ struct MoreView: View {
             .background(Color.zzCanvas)
         }
         .background(Color.zzCanvas.ignoresSafeArea())
-        .confirmationDialog(
-            settings.t("Delete all devices?"),
-            isPresented: $showClearConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button(settings.t("Delete all"), role: .destructive) {
-                manager.clearSavedRecords()
-            }
-            Button(settings.t("Cancel"), role: .cancel) {}
-        } message: {
-            Text(settings.t("This removes every saved device and disconnects the active GPS module."))
-        }
     }
 
     // MARK: Account
@@ -2312,18 +2308,151 @@ struct MoreView: View {
 
     // MARK: Settings
 
-    private var settingsSection: some View {
+    private var settingsEntry: some View {
         VStack(alignment: .leading, spacing: 10) {
             ZZSectionHeader(title: settings.t("Settings"))
 
-            languageCard
-            gpsSettingsCard
-            mapAlignmentCard
+            NavigationLink {
+                SettingsView(manager: manager)
+            } label: {
+                settingsRow(
+                    icon: "gearshape",
+                    title: settings.t("Settings"),
+                    value: "",
+                    showsChevron: true
+                )
+            }
+            .buttonStyle(.plain)
+            .zzCard(cornerRadius: 16)
+        }
+    }
 
-            Text(settings.t("Deleting devices disconnects the active GPS module."))
-                .font(.system(size: 11, weight: .regular))
+    // MARK: About
+
+    private var aboutSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ZZSectionHeader(title: settings.t("About"))
+
+            VStack(spacing: 0) {
+                settingsRow(
+                    icon: "info.circle",
+                    title: settings.t("Version"),
+                    value: versionDisplay,
+                    showsChevron: false
+                )
+                Rectangle()
+                    .fill(Color.zzLine)
+                    .frame(height: 0.5)
+                    .padding(.leading, 56)
+                settingsRow(
+                    icon: "location.north.circle",
+                    title: settings.t("Protocol"),
+                    value: settings.t("Bluetooth LE"),
+                    showsChevron: false
+                )
+            }
+            .zzCard(cornerRadius: 16)
+        }
+    }
+
+    private var versionDisplay: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        return build.isEmpty ? version : "\(version) (\(build))"
+    }
+
+    private var footer: some View {
+        VStack(spacing: 6) {
+            ZZWordmark()
+            Text(settings.t("TRACK GRADE GPS LINK"))
+                .font(.system(size: 9, weight: .semibold))
+                .tracking(1.2)
                 .foregroundStyle(Color.zzTertiary)
-                .padding(.horizontal, 4)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 8)
+    }
+
+    private func settingsRow(
+        icon: String,
+        title: String,
+        value: String,
+        showsChevron: Bool
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.zzInk)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(Color.zzMutedSurface))
+
+            Text(title)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color.zzInk)
+
+            Spacer(minLength: 8)
+
+            Text(value)
+                .font(.system(size: 12.5, weight: .regular))
+                .foregroundStyle(Color.zzSecondary)
+                .lineLimit(1)
+
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.zzTertiary)
+            }
+        }
+        .padding(14)
+        .contentShape(Rectangle())
+    }
+}
+
+private struct SettingsView: View {
+    @ObservedObject var manager: GPSLinkManager
+    @EnvironmentObject private var settings: AppSettings
+    @State private var showClearConfirmation = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ZZScreenHeader(
+                title: settings.t("Settings"),
+                statusText: manager.zzStatus(language: settings.language).text,
+                statusColor: manager.zzStatus(language: settings.language).color
+            )
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    languageCard
+                    gpsSettingsCard
+                    mapAlignmentCard
+
+                    Text(settings.t("Deleting devices disconnects the active GPS module."))
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(Color.zzTertiary)
+                        .padding(.horizontal, 4)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+                .padding(.bottom, 28)
+                .frame(maxWidth: 680)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            .background(Color.zzCanvas)
+        }
+        .background(Color.zzCanvas.ignoresSafeArea())
+        .confirmationDialog(
+            settings.t("Delete all devices?"),
+            isPresented: $showClearConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(settings.t("Delete all"), role: .destructive) {
+                manager.clearSavedRecords()
+            }
+            Button(settings.t("Cancel"), role: .cancel) {}
+        } message: {
+            Text(settings.t("This removes every saved device and disconnects the active GPS module."))
         }
     }
 
@@ -2442,52 +2571,6 @@ struct MoreView: View {
         .zzCard(cornerRadius: 16)
     }
 
-    // MARK: About
-
-    private var aboutSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ZZSectionHeader(title: settings.t("About"))
-
-            VStack(spacing: 0) {
-                settingsRow(
-                    icon: "info.circle",
-                    title: settings.t("Version"),
-                    value: versionDisplay,
-                    showsChevron: false
-                )
-                Rectangle()
-                    .fill(Color.zzLine)
-                    .frame(height: 0.5)
-                    .padding(.leading, 56)
-                settingsRow(
-                    icon: "location.north.circle",
-                    title: settings.t("Protocol"),
-                    value: settings.t("Bluetooth LE"),
-                    showsChevron: false
-                )
-            }
-            .zzCard(cornerRadius: 16)
-        }
-    }
-
-    private var versionDisplay: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0"
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
-        return build.isEmpty ? version : "\(version) (\(build))"
-    }
-
-    private var footer: some View {
-        VStack(spacing: 6) {
-            ZZWordmark()
-            Text(settings.t("TRACK GRADE GPS LINK"))
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(1.2)
-                .foregroundStyle(Color.zzTertiary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 8)
-    }
-
     private func settingsRow(
         icon: String,
         title: String,
@@ -2558,7 +2641,7 @@ private struct TrackDashboardView: View {
                         VStack(spacing: spacing) {
                             gForcePanel
                                 .frame(width: side, height: side)
-                            routePanel
+                            elapsedPanel
                                 .frame(width: side, height: side)
                         }
                         .frame(width: side)
@@ -2576,7 +2659,7 @@ private struct TrackDashboardView: View {
                         HStack(spacing: spacing) {
                             gForcePanel
                                 .frame(width: side, height: side)
-                            routePanel
+                            elapsedPanel
                                 .frame(width: side, height: side)
                         }
                         .frame(maxWidth: .infinity)
@@ -2710,41 +2793,48 @@ private struct TrackDashboardView: View {
         .zzCard(cornerRadius: 18)
     }
 
-    private var routePanel: some View {
+    private var elapsedPanel: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text(settings.t("Route"))
+                Text(settings.t("Elapsed time"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Color.zzSecondary)
 
                 Spacer(minLength: 6)
 
-                Text(String(format: "%.2f", manager.trackTelemetry.distanceKm))
-                    .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                Image(systemName: "timer")
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Color.zzTertiary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.65)
             }
 
-            Canvas { context, size in
-                drawRoute(context: &context, size: size)
-            }
-            .background(
-                Color.zzMutedSurface.opacity(0.3),
-                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-            )
-            .overlay {
-                if manager.trackTelemetry.route.count < 2 {
-                    Text(settings.t("No route data yet"))
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Color.zzTertiary)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Spacer(minLength: 0)
+
+            Text(elapsedValueText)
+                .font(.system(size: 30, weight: .bold, design: .monospaced))
+                .foregroundStyle(Color.zzInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+
+            Spacer(minLength: 0)
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .zzCard(cornerRadius: 18)
+    }
+
+    private var elapsedValueText: String {
+        let telemetry = manager.trackTelemetry
+        let hasData = telemetry.date != nil
+            || telemetry.satellites != nil
+            || telemetry.latitude != nil
+        return hasData ? elapsedText(telemetry.elapsed) : "—"
+    }
+
+    private func elapsedText(_ elapsed: TimeInterval) -> String {
+        let total = max(0, elapsed)
+        let minutes = Int(total) / 60
+        let seconds = total - Double(minutes * 60)
+        return String(format: "%d:%04.1f", minutes, seconds)
     }
 
     private func pointSize(_ point: GForcePoint) -> CGFloat {
@@ -2754,74 +2844,6 @@ private struct TrackDashboardView: View {
     private func pointColor(_ point: GForcePoint) -> Color {
         let age = max(0, nextPointID - point.id)
         return Color.zzRed.opacity(max(0.12, 1 - Double(age) / 160))
-    }
-
-    private func drawRoute(context: inout GraphicsContext, size: CGSize) {
-        let route = manager.trackTelemetry.route
-        let rect = CGRect(origin: .zero, size: size).insetBy(dx: 10, dy: 10)
-        guard rect.width > 20, rect.height > 20 else { return }
-
-        var grid = Path()
-        for step in 0...4 {
-            let x = rect.minX + rect.width * CGFloat(step) / 4
-            let y = rect.minY + rect.height * CGFloat(step) / 4
-            grid.move(to: CGPoint(x: x, y: rect.minY))
-            grid.addLine(to: CGPoint(x: x, y: rect.maxY))
-            grid.move(to: CGPoint(x: rect.minX, y: y))
-            grid.addLine(to: CGPoint(x: rect.maxX, y: y))
-        }
-        context.stroke(
-            grid,
-            with: .color(Color.zzLine.opacity(0.35)),
-            style: StrokeStyle(lineWidth: 0.5)
-        )
-
-        guard route.count > 1 else { return }
-
-        let latitudes = route.map(\.latitude)
-        let longitudes = route.map(\.longitude)
-        guard let minLat = latitudes.min(), let maxLat = latitudes.max(),
-              let minLon = longitudes.min(), let maxLon = longitudes.max() else { return }
-
-        let spanLat = max(maxLat - minLat, 0.000001)
-        let spanLon = max(maxLon - minLon, 0.000001)
-        let scale = min(rect.width / CGFloat(spanLon), rect.height / CGFloat(spanLat))
-        let centerLat = (minLat + maxLat) / 2
-        let centerLon = (minLon + maxLon) / 2
-
-        func project(_ latitude: Double, _ longitude: Double) -> CGPoint {
-            CGPoint(
-                x: rect.midX + CGFloat(longitude - centerLon) * scale,
-                y: rect.midY - CGFloat(latitude - centerLat) * scale
-            )
-        }
-
-        var path = Path()
-        path.move(to: project(route[0].latitude, route[0].longitude))
-        for point in route.dropFirst() {
-            path.addLine(to: project(point.latitude, point.longitude))
-        }
-        context.stroke(
-            path,
-            with: .color(Color.zzRed),
-            style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
-        )
-
-        let start = project(route[0].latitude, route[0].longitude)
-        let end = project(route[route.count - 1].latitude, route[route.count - 1].longitude)
-
-        context.fill(
-            Path(ellipseIn: CGRect(x: start.x - 3, y: start.y - 3, width: 6, height: 6)),
-            with: .color(Color.zzGreen)
-        )
-
-        let endRect = CGRect(x: end.x - 4, y: end.y - 4, width: 8, height: 8)
-        context.fill(Path(ellipseIn: endRect), with: .color(Color.zzRed))
-        context.stroke(
-            Path(ellipseIn: endRect),
-            with: .color(Color.white.opacity(0.85)),
-            style: StrokeStyle(lineWidth: 1)
-        )
     }
 
     private func consume(_ telemetry: TrackTelemetry) {
@@ -3591,7 +3613,17 @@ struct TrackTimingView: View {
         #if os(iOS)
         .toolbar(.hidden, for: .tabBar)
         #endif
-        .onAppear(perform: normalizeOrder)
+        .onAppear {
+            normalizeOrder()
+            #if os(iOS)
+            UIApplication.shared.isIdleTimerDisabled = true
+            #endif
+        }
+        .onDisappear {
+            #if os(iOS)
+            UIApplication.shared.isIdleTimerDisabled = false
+            #endif
+        }
         .zzOnChange(of: order) { newOrder in
             orderRaw = newOrder.joined(separator: ",")
         }

@@ -60,7 +60,7 @@ enum AppTab: String, CaseIterable, Identifiable {
 /// China's online maps (including Apple Maps in mainland China) use the
 /// GCJ-02 datum, while GPS / RaceChrono data is WGS84. When enabled, WGS84
 /// coordinates are offset only for display; stored data keeps WGS84.
-private enum ChinaMapAlignment {
+enum ChinaMapAlignment {
     private static let a = 6378245.0
     private static let ee = 0.00669342162296594323
 
@@ -3563,6 +3563,7 @@ struct TrackTimingView: View {
     @State private var selectedTrackID = ""
     @State private var availableTracks: [LapTrackConfig] = []
     @State private var showTrackPicker = false
+    @State private var showEndConfirmation = false
 
     @EnvironmentObject private var settings: AppSettings
     @Environment(\.dismiss) private var dismiss
@@ -3683,6 +3684,8 @@ struct TrackTimingView: View {
         }
         #if os(iOS)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar(.visible, for: .bottomBar)
+        .toolbarBackground(.visible, for: .bottomBar)
         #endif
         .safeAreaInset(edge: .top, spacing: 0) {
             trackSelectionBanner
@@ -3692,6 +3695,15 @@ struct TrackTimingView: View {
                 tracks: availableTracks,
                 selectedTrackID: $selectedTrackID
             )
+        }
+        .alert(
+            settings.t("End this session?"),
+            isPresented: $showEndConfirmation
+        ) {
+            Button(settings.t("End"), role: .destructive) {
+                endSession()
+            }
+            Button(settings.t("Cancel"), role: .cancel) {}
         }
         .onAppear {
             normalizeOrder()
@@ -3933,7 +3945,7 @@ struct TrackTimingView: View {
     #if os(iOS)
     private var endToolbarButton: some View {
         Button {
-            endSession()
+            showEndConfirmation = true
         } label: {
             Image(systemName: "stop.fill")
         }

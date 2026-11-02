@@ -111,6 +111,7 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
     @Published private(set) var connectedRSSI: Int?
     @Published private(set) var connectedMACAddress: String?
     @Published private(set) var batteryLevel: Int?
+    @Published private(set) var batteryIsCharging: Bool?
     @Published private(set) var trackTelemetry = TrackTelemetry()
     @Published private(set) var linkEventID = 0
     @Published private(set) var alert: GPSLinkAlert?
@@ -159,6 +160,7 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
     private let maximumSavedModules = 12
     private let batteryServiceUUID = CBUUID(string: "180F")
     private let batteryLevelUUID = CBUUID(string: "2A19")
+    private let batteryStatusUUID = CBUUID(string: "2A1A")
     private let raceChronoServiceUUID = CBUUID(string: "1FF8")
     private let raceChronoGPSUUID = CBUUID(string: "0003")
     private let raceChronoTimeUUID = CBUUID(string: "0004")
@@ -385,6 +387,7 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
         connectedModule = nil
         connectedRSSI = nil
         batteryLevel = nil
+        batteryIsCharging = nil
         linkState = .idle
     }
 
@@ -1149,6 +1152,7 @@ extension GPSLinkManager: CBCentralManagerDelegate {
                 connectedModule = nil
                 connectedRSSI = nil
                 batteryLevel = nil
+        batteryIsCharging = nil
                 linkState = .idle
                 alert = GPSLinkAlert(
                     title: l10n.t("Link lost"),
@@ -1305,6 +1309,7 @@ extension GPSLinkManager: CBCentralManagerDelegate {
         connectedMACAddress = macAddress
         resetTrackTelemetry(startSession: true)
         batteryLevel = nil
+        batteryIsCharging = nil
         linkState = .connected
         linkEventID += 1
 
@@ -1379,6 +1384,7 @@ extension GPSLinkManager: CBCentralManagerDelegate {
         connectedModule = nil
         connectedRSSI = nil
         batteryLevel = nil
+        batteryIsCharging = nil
 
         if wasConnected || wasConnecting {
             linkState = .idle
@@ -1438,7 +1444,7 @@ extension GPSLinkManager: CBPeripheralDelegate {
             guard error == nil else { return }
 
             if let batteryService = peripheral.services?.first(where: { $0.uuid == batteryServiceUUID }) {
-                peripheral.discoverCharacteristics([batteryLevelUUID], for: batteryService)
+                peripheral.discoverCharacteristics([batteryLevelUUID, batteryStatusUUID], for: batteryService)
             }
 
             if let raceService = peripheral.services?.first(where: { $0.uuid == raceChronoServiceUUID }) {
@@ -1508,14 +1514,22 @@ extension GPSLinkManager: CBPeripheralDelegate {
         guard
             isConnected,
             error == nil,
-            service.uuid == batteryServiceUUID,
-            let battery = service.characteristics?.first(where: { $0.uuid == batteryLevelUUID })
+            service.uuid == batteryServiceUUID
         else { return }
 
-        if battery.properties.contains(.notify) {
-            peripheral.setNotifyValue(true, for: battery)
+        if let battery = service.characteristics?.first(where: { $0.uuid == batteryLevelUUID }) {
+            if battery.properties.contains(.notify) {
+                peripheral.setNotifyValue(true, for: battery)
+            }
+            peripheral.readValue(for: battery)
         }
-        peripheral.readValue(for: battery)
+
+        if let status = service.characteristics?.first(where: { $0.uuid == batteryStatusUUID }) {
+            if status.properties.contains(.notify) {
+                peripheral.setNotifyValue(true, for: status)
+            }
+            peripheral.readValue(for: status)
+        }
     }
 
     func peripheral(
@@ -1568,6 +1582,13 @@ extension GPSLinkManager: CBPeripheralDelegate {
             return
         }
 
+        if characteristic.uuid == batteryStatusUUID {
+            if let value = characteristic.value {
+                parseBatteryStatus(value)
+            }
+            return
+        }
+
         guard
             error == nil,
             characteristic.uuid == batteryLevelUUID,
@@ -1575,6 +1596,24 @@ extension GPSLinkManager: CBPeripheralDelegate {
         else { return }
 
         batteryLevel = Int(value)
+    }
+
+    private func parseBatteryStatus(_ data: Data) {
+        let bytes = [UInt8](data)
+        guard let flags = bytes.first else { return }
+        var index = 1
+        if flags & 0x02 != 0 { index += 1 }
+        guard flags & 0x04 != 0, index < bytes.count else { return }
+        let status = bytes[index]
+        let charging = status & 0x02 != 0
+        let discharging = status & 0x01 != 0
+        if charging {
+            batteryIsCharging = true
+        } else if discharging {
+            batteryIsCharging = false
+        } else {
+            batteryIsCharging = nil
+        }
     }
 
     func peripheral(

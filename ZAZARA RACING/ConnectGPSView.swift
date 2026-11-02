@@ -392,7 +392,7 @@ struct DevicesView: View {
 
                 metric(
                     title: settings.t("Battery"),
-                    value: manager.batteryLevel.map { "\($0)%" } ?? "—"
+                    value: manager.batteryLevel.map { "\($0)%\(manager.batteryIsCharging == true ? " ⚡" : "")" } ?? "—"
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 14)

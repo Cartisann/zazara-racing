@@ -115,6 +115,8 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
     @Published private(set) var trackTelemetry = TrackTelemetry()
     @Published private(set) var linkEventID = 0
     @Published private(set) var alert: GPSLinkAlert?
+    /// 低电量弹窗（连接时/连接中电量 <20% 触发一次）。
+    @Published var lowBatteryAlertPresented = false
 
     // MARK: Computed state
 
@@ -151,6 +153,9 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
     private var intentionalDisconnect = false
     private var connectTimeout: Timer?
     private var rssiTimer: Timer?
+    private var lowBatteryWarned = false
+    private var batteryLevelCharacteristic: CBCharacteristic?
+    private var batteryStatusCharacteristic: CBCharacteristic?
     private var savedAvailabilitySeenAt: [UUID: Date] = [:]
     private var savedAvailabilityExpiry: [UUID: DispatchWorkItem] = [:]
 
@@ -345,6 +350,7 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
         clearRaceChronoCharacteristics()
         resetTrackTelemetry()
         clearSavedAvailability()
+        resetLowBatteryWarning()
 
         if let peripheral = activePeripheral {
             intentionalDisconnect = true
@@ -388,6 +394,7 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
         connectedRSSI = nil
         batteryLevel = nil
         batteryIsCharging = nil
+        resetLowBatteryWarning()
         linkState = .idle
     }
 
@@ -526,6 +533,28 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
         alert = nil
     }
 
+    func dismissLowBatteryAlert() {
+        lowBatteryAlertPresented = false
+    }
+
+    /// 连接建立时/连接中电量低于 20% 时弹一次；回到 20% 以上后重新武装。
+    private func evaluateLowBatteryWarning() {
+        guard isConnected, let level = batteryLevel else { return }
+        if level < 20 {
+            if !lowBatteryWarned {
+                lowBatteryWarned = true
+                lowBatteryAlertPresented = true
+            }
+        } else {
+            lowBatteryWarned = false
+        }
+    }
+
+    private func resetLowBatteryWarning() {
+        lowBatteryWarned = false
+        lowBatteryAlertPresented = false
+    }
+
     private func recordLink(id: UUID, name: String, hardwareID: String?) -> SavedGPSModule {
         let existingHardwareID = savedModules.first(where: { $0.id == id })?.hardwareID
         let module = SavedGPSModule(
@@ -600,6 +629,15 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
         if heartbeatPendingAt == nil, let identityCharacteristic {
             heartbeatPendingAt = now
             peripheral.readValue(for: identityCharacteristic)
+        }
+
+        // 电池状态兜底轮询：即使 CCCD notify 没生效，也能在 2s 内切换
+        // 充电/放电状态和低电量提示。
+        if let batteryLevelCharacteristic {
+            peripheral.readValue(for: batteryLevelCharacteristic)
+        }
+        if let batteryStatusCharacteristic {
+            peripheral.readValue(for: batteryStatusCharacteristic)
         }
 
         if rssiPendingAt == nil {
@@ -726,6 +764,8 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
     private func clearRaceChronoCharacteristics() {
         raceChronoGPSCharacteristic = nil
         raceChronoTimeCharacteristic = nil
+        batteryLevelCharacteristic = nil
+        batteryStatusCharacteristic = nil
     }
 
     private func readUInt16(_ data: Data, at offset: Int) -> UInt16 {
@@ -1310,8 +1350,10 @@ extension GPSLinkManager: CBCentralManagerDelegate {
         resetTrackTelemetry(startSession: true)
         batteryLevel = nil
         batteryIsCharging = nil
+        resetLowBatteryWarning()
         linkState = .connected
         linkEventID += 1
+        evaluateLowBatteryWarning()
 
         startSignalPolling()
         peripheral.discoverServices([batteryServiceUUID, raceChronoServiceUUID])
@@ -1385,6 +1427,7 @@ extension GPSLinkManager: CBCentralManagerDelegate {
         connectedRSSI = nil
         batteryLevel = nil
         batteryIsCharging = nil
+        resetLowBatteryWarning()
 
         if wasConnected || wasConnecting {
             linkState = .idle
@@ -1518,6 +1561,7 @@ extension GPSLinkManager: CBPeripheralDelegate {
         else { return }
 
         if let battery = service.characteristics?.first(where: { $0.uuid == batteryLevelUUID }) {
+            batteryLevelCharacteristic = battery
             if battery.properties.contains(.notify) {
                 peripheral.setNotifyValue(true, for: battery)
             }
@@ -1525,6 +1569,7 @@ extension GPSLinkManager: CBPeripheralDelegate {
         }
 
         if let status = service.characteristics?.first(where: { $0.uuid == batteryStatusUUID }) {
+            batteryStatusCharacteristic = status
             if status.properties.contains(.notify) {
                 peripheral.setNotifyValue(true, for: status)
             }
@@ -1596,22 +1641,19 @@ extension GPSLinkManager: CBPeripheralDelegate {
         else { return }
 
         batteryLevel = Int(value)
+        evaluateLowBatteryWarning()
     }
 
     private func parseBatteryStatus(_ data: Data) {
-        let bytes = [UInt8](data)
-        guard let flags = bytes.first else { return }
-        var index = 1
-        if flags & 0x02 != 0 { index += 1 }
-        guard flags & 0x04 != 0, index < bytes.count else { return }
-        let status = bytes[index]
-        let charging = status & 0x02 != 0
-        let discharging = status & 0x01 != 0
-        if charging {
+        // 0x2A1A Battery Power State 是单字节枚举，不是位标志：
+        // 0=Unknown, 1=Charging, 2=Discharging, 3=Not charging, 4=Full
+        guard let status = data.first else { return }
+        switch status {
+        case 1:
             batteryIsCharging = true
-        } else if discharging {
+        case 2, 3, 4:
             batteryIsCharging = false
-        } else {
+        default:
             batteryIsCharging = nil
         }
     }

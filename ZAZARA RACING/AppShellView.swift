@@ -203,6 +203,13 @@ struct AppShellView: View {
         .onAppear {
             manager.setBuiltInGPS(UserDefaults.standard.bool(forKey: "zazara.useBuiltInGPS"))
         }
+        .alert(settings.t("Low battery"), isPresented: $manager.lowBatteryAlertPresented) {
+            Button(settings.t("OK"), role: .cancel) {
+                manager.dismissLowBatteryAlert()
+            }
+        } message: {
+            Text(settings.t("Battery below 20%. Please charge soon."))
+        }
     }
 
     /// Native system tab bar. On iOS 18+ the tab bar adapts to a sidebar on

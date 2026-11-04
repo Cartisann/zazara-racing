@@ -392,7 +392,12 @@ struct DevicesView: View {
 
                 metric(
                     title: settings.t("Battery"),
-                    value: manager.batteryLevel.map { "\($0)%\(manager.batteryIsCharging == true ? " ⚡" : "")" } ?? "—"
+                    value: manager.batteryLevel.map { "\($0)%" } ?? "—",
+                    valueColor: (manager.batteryLevel ?? 100) < 20 ? .zzRed : .zzInk,
+                    status: manager.batteryIsCharging == true
+                        ? settings.t("Charging")
+                        : ((manager.batteryLevel ?? 100) < 20 ? settings.t("Low battery") : nil),
+                    statusColor: manager.batteryIsCharging == true ? .zzGreen : .zzRed
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 14)
@@ -444,7 +449,13 @@ struct DevicesView: View {
         .zzCard(cornerRadius: 20)
     }
 
-    private func metric(title: String, value: String) -> some View {
+    private func metric(
+        title: String,
+        value: String,
+        valueColor: Color = .zzInk,
+        status: String? = nil,
+        statusColor: Color = .zzGreen
+    ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title.uppercased())
                 .font(.system(size: 9, weight: .semibold))
@@ -453,9 +464,16 @@ struct DevicesView: View {
 
             Text(value)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Color.zzInk)
+                .foregroundStyle(valueColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+
+            if let status {
+                Text(status)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(statusColor)
+                    .lineLimit(1)
+            }
         }
     }
 

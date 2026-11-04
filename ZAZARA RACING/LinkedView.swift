@@ -185,7 +185,15 @@ struct LinkedView: View {
                 metric(
                     title: settings.t("Battery"),
                     value: manager.batteryLevel.map { "\($0)%" } ?? "—",
-                    footnote: settings.t("Percent")
+                    footnote: manager.batteryIsCharging == true
+                        ? settings.t("Charging")
+                        : ((manager.batteryLevel ?? 100) < 20
+                            ? settings.t("Low battery")
+                            : settings.t("Percent")),
+                    valueColor: (manager.batteryLevel ?? 100) < 20 ? .zzRed : .zzInk,
+                    footnoteColor: manager.batteryIsCharging == true
+                        ? .zzGreen
+                        : ((manager.batteryLevel ?? 100) < 20 ? .zzRed : .zzSecondary)
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 14)
@@ -228,7 +236,13 @@ struct LinkedView: View {
         .zzCard(cornerRadius: 20)
     }
 
-    private func metric(title: String, value: String, footnote: String) -> some View {
+    private func metric(
+        title: String,
+        value: String,
+        footnote: String,
+        valueColor: Color = .zzInk,
+        footnoteColor: Color = .zzSecondary
+    ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title.uppercased())
                 .font(.system(size: 9, weight: .semibold))
@@ -237,13 +251,13 @@ struct LinkedView: View {
 
             Text(value)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Color.zzInk)
+                .foregroundStyle(valueColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
             Text(footnote)
                 .font(.system(size: 10.5, weight: .regular))
-                .foregroundStyle(Color.zzSecondary)
+                .foregroundStyle(footnoteColor)
                 .lineLimit(1)
         }
     }

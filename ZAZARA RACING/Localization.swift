@@ -327,6 +327,13 @@ final class AppSettings: ObservableObject {
         // Connecting overlay
         "Keep the module close to your phone.": "请将模块靠近手机。",
         "Cancel": "取消",
+        "Begin": "开始",
+        "No track synced": "未同步赛道",
+        "Push to watch": "推送到手表",
+        "Records": "记录",
+        "Pending upload": "待上传",
+        "Select a track first": "请先选择赛道",
+        "Hide": "收起",
         "Details": "详情",
         "Laps": "圈数",
         "Best lap": "最佳圈",

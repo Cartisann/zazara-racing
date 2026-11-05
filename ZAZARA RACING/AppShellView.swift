@@ -3571,8 +3571,13 @@ struct TrackTimingView: View {
     @State private var availableTracks: [LapTrackConfig] = []
     @State private var showTrackPicker = false
     @State private var showEndConfirmation = false
+    @State private var showTrackPushResult = false
+    @State private var trackPushResult = ""
 
     @EnvironmentObject private var settings: AppSettings
+    #if os(iOS)
+    @EnvironmentObject private var watchSync: PhoneWatchSync
+    #endif
     @Environment(\.dismiss) private var dismiss
     @AppStorage("zazara.trackTileOrder.v1") private var orderRaw = ""
     @State private var order = TrackTileID.defaultOrder
@@ -3677,6 +3682,9 @@ struct TrackTimingView: View {
                 }
                 .accessibilityLabel(settings.t("Details"))
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                trackPushButton
+            }
             #endif
             #if os(macOS)
             ToolbarItem(placement: .primaryAction) {
@@ -3756,6 +3764,29 @@ struct TrackTimingView: View {
             laps: []
         )
     }
+    #if os(iOS)
+    private var trackPushButton: some View {
+        Button {
+            guard let track = selectedTrack else {
+                trackPushResult = settings.t("Select a track first")
+                showTrackPushResult = true
+                return
+            }
+            watchSync.pushTrack(track)
+            trackPushResult = watchSync.lastPushStatus ?? ""
+            showTrackPushResult = true
+        } label: {
+            Image(systemName: "applewatch")
+        }
+        .accessibilityLabel(settings.t("Push to watch"))
+        .alert(settings.t("Push to watch"), isPresented: $showTrackPushResult) {
+            Button(settings.t("OK")) {}
+        } message: {
+            Text(trackPushResult)
+        }
+    }
+    #endif
+
     private var selectedTrack: LapTrackConfig? {
         availableTracks.first { $0.trackID == selectedTrackID }
     }

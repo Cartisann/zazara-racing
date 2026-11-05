@@ -17,6 +17,7 @@
 		CC0000000000000000000003 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = CC0000000000000000000002 /* ZIPFoundation */; };
 		AAD954603083C71300B571B3 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AAD9545F3083C71300B571B3 /* Preview Assets.xcassets */; };
 		AAD9546A3083C71300B571B3 /* ZAZARA_RACINGTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD954693083C71300B571B3 /* ZAZARA_RACINGTests.swift */; };
+		AA11F1E2A3B4C5D6E7F84001 /* WatchSyncWireFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11F1E2A3B4C5D6E7F84000 /* WatchSyncWireFormatTests.swift */; };
 		AAD954743083C71400B571B3 /* ZAZARA_RACINGUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD954733083C71400B571B3 /* ZAZARA_RACINGUITests.swift */; };
 		AAD954763083C71400B571B3 /* ZAZARA_RACINGUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD954753083C71400B571B3 /* ZAZARA_RACINGUITestsLaunchTests.swift */; };
 		AAD955023083C71100B571B3 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD955013083C71100B571B3 /* DesignSystem.swift */; };
@@ -25,6 +26,8 @@
 		AAD955083083C71100B571B3 /* LinkedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD955073083C71100B571B3 /* LinkedView.swift */; };
 		AAD9550A3083C71100B571B3 /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD955093083C71100B571B3 /* AppShellView.swift */; };
 		AA11F1E2A3B4C5D6E7F80002 /* LapTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11F1E2A3B4C5D6E7F80001 /* LapTiming.swift */; };
+		AA11F1E2A3B4C5D6E7F80004 /* LapTimingCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11F1E2A3B4C5D6E7F80003 /* LapTimingCore.swift */; };
+		AA11F1E2A3B4C5D6E7F80006 /* PhoneWatchSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11F1E2A3B4C5D6E7F80005 /* PhoneWatchSync.swift */; };
 		AAD9550C3083C71100B571B3 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD9550B3083C71100B571B3 /* Localization.swift */; };
 /* End PBXBuildFile section */
 
@@ -58,6 +61,7 @@
 		AAD9545F3083C71300B571B3 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		AAD954653083C71300B571B3 /* ZAZARA RACINGTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "ZAZARA RACINGTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AAD954693083C71300B571B3 /* ZAZARA_RACINGTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZAZARA_RACINGTests.swift; sourceTree = "<group>"; };
+		AA11F1E2A3B4C5D6E7F84000 /* WatchSyncWireFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSyncWireFormatTests.swift; sourceTree = "<group>"; };
 		AAD9546F3083C71400B571B3 /* ZAZARA RACINGUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "ZAZARA RACINGUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AAD954733083C71400B571B3 /* ZAZARA_RACINGUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZAZARA_RACINGUITests.swift; sourceTree = "<group>"; };
 		AAD954753083C71400B571B3 /* ZAZARA_RACINGUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZAZARA_RACINGUITestsLaunchTests.swift; sourceTree = "<group>"; };
@@ -67,6 +71,8 @@
 		AAD955073083C71100B571B3 /* LinkedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkedView.swift; sourceTree = "<group>"; };
 		AAD955093083C71100B571B3 /* AppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellView.swift; sourceTree = "<group>"; };
 		AA11F1E2A3B4C5D6E7F80001 /* LapTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LapTiming.swift; sourceTree = "<group>"; };
+		AA11F1E2A3B4C5D6E7F80003 /* LapTimingCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LapTimingCore.swift; sourceTree = "<group>"; };
+		AA11F1E2A3B4C5D6E7F80005 /* PhoneWatchSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneWatchSync.swift; sourceTree = "<group>"; };
 		AAD9550B3083C71100B571B3 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -127,6 +133,8 @@
 				AAD955073083C71100B571B3 /* LinkedView.swift */,
 				AAD955093083C71100B571B3 /* AppShellView.swift */,
 				AA11F1E2A3B4C5D6E7F80001 /* LapTiming.swift */,
+				AA11F1E2A3B4C5D6E7F80003 /* LapTimingCore.swift */,
+				AA11F1E2A3B4C5D6E7F80005 /* PhoneWatchSync.swift */,
 				AAD9550B3083C71100B571B3 /* Localization.swift */,
 				AAD9545B3083C71300B571B3 /* Assets.xcassets */,
 				AAD9545D3083C71300B571B3 /* ZAZARA_RACING.entitlements */,
@@ -159,6 +167,7 @@
 			isa = PBXGroup;
 			children = (
 				AAD954693083C71300B571B3 /* ZAZARA_RACINGTests.swift */,
+				AA11F1E2A3B4C5D6E7F84000 /* WatchSyncWireFormatTests.swift */,
 			);
 			path = "ZAZARA RACINGTests";
 			sourceTree = "<group>";
@@ -182,6 +191,7 @@
 				AAD954503083C71100B571B3 /* Sources */,
 				AAD954513083C71100B571B3 /* Frameworks */,
 				AAD954523083C71100B571B3 /* Resources */,
+				AA11F1E2A3B4C5D6E7F85000 /* Copy Watch App */,
 			);
 			buildRules = (
 			);
@@ -307,6 +317,24 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		AA11F1E2A3B4C5D6E7F85000 /* Copy Watch App */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Copy Watch App";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"$PLATFORM_NAME\" = \"iphonesimulator\" ]; then\n  WATCH_BUNDLE=\"/tmp/zazara-watch-build/ZAZARA RACING Watch.app\"\nelif [ \"$PLATFORM_NAME\" = \"iphoneos\" ]; then\n  WATCH_BUNDLE=\"/tmp/zazara-watch-build-device/ZAZARA RACING Watch.app\"\nelse\n  exit 0\nfi\nif [ -d \"$WATCH_BUNDLE\" ]; then\n  mkdir -p \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Watch\"\n  rm -rf \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Watch/ZAZARA RACING Watch.app\"\n  cp -R \"$WATCH_BUNDLE\" \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Watch/\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		AAD954503083C71100B571B3 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -319,6 +347,8 @@
 				AAD955083083C71100B571B3 /* LinkedView.swift in Sources */,
 				AAD9550A3083C71100B571B3 /* AppShellView.swift in Sources */,
 				AA11F1E2A3B4C5D6E7F80002 /* LapTiming.swift in Sources */,
+				AA11F1E2A3B4C5D6E7F80004 /* LapTimingCore.swift in Sources */,
+				AA11F1E2A3B4C5D6E7F80006 /* PhoneWatchSync.swift in Sources */,
 				AAD9550C3083C71100B571B3 /* Localization.swift in Sources */,
 				AAD954583083C71100B571B3 /* ZAZARA_RACINGApp.swift in Sources */,
 			);
@@ -329,6 +359,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AAD9546A3083C71300B571B3 /* ZAZARA_RACINGTests.swift in Sources */,
+				AA11F1E2A3B4C5D6E7F84001 /* WatchSyncWireFormatTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

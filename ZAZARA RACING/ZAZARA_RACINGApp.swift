@@ -41,13 +41,24 @@ struct ZAZARA_RACINGApp: App {
     #endif
     @StateObject private var gpsLinkManager = GPSLinkManager()
     @StateObject private var settings = AppSettings.shared
+    #if os(iOS)
+    @StateObject private var watchSync = PhoneWatchSync()
+    #endif
 
     var body: some Scene {
         WindowGroup {
+            #if os(iOS)
+            ContentView()
+                .environmentObject(gpsLinkManager)
+                .environmentObject(settings)
+                .environmentObject(watchSync)
+                .preferredColorScheme(.dark)
+            #else
             ContentView()
                 .environmentObject(gpsLinkManager)
                 .environmentObject(settings)
                 .preferredColorScheme(.dark)
+            #endif
         }
     }
 }

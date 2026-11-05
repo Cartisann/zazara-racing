@@ -148,6 +148,7 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
     private var pendingModule: SavedGPSModule?
     private var wantsScan = false
     private var isDisconnecting = false
+    private var disconnectWatchdog: Timer?
     private var isReconnectScan = false
     private var isResolvingConnection = false
     private var intentionalDisconnect = false
@@ -206,6 +207,7 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
         connectTimeout?.invalidate()
         rssiTimer?.invalidate()
         savedAvailabilityExpiry.values.forEach { $0.cancel() }
+        disconnectWatchdog?.invalidate()
     }
 
     // MARK: Scanning
@@ -224,6 +226,16 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
         if isDisconnecting {
             isScanning = true
             discoveredModules = []
+            // watchOS can delay/lose the disconnect callback; schedule the
+            // real scan anyway so the second search is not stuck forever.
+            disconnectWatchdog?.invalidate()
+            disconnectWatchdog = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { [weak self] _ in
+                guard let self, self.isDisconnecting else { return }
+                self.isDisconnecting = false
+                if self.wantsScan, self.linkState == .idle {
+                    self.beginScan(clearResults: true)
+                }
+            }
             return
         }
 
@@ -396,6 +408,17 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
         batteryIsCharging = nil
         resetLowBatteryWarning()
         linkState = .idle
+
+        // Fallback for watchOS: if didDisconnectPeripheral does not arrive,
+        // clear the flag so a later search can actually scan.
+        disconnectWatchdog?.invalidate()
+        disconnectWatchdog = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
+            guard let self, self.isDisconnecting else { return }
+            self.isDisconnecting = false
+            if self.wantsScan, self.linkState == .idle {
+                self.beginScan(clearResults: true)
+            }
+        }
     }
 
     private func beginConnectionAttempt() {
@@ -1399,6 +1422,8 @@ extension GPSLinkManager: CBCentralManagerDelegate {
         wasConnecting: Bool,
         wasIntentional: Bool
     ) {
+        disconnectWatchdog?.invalidate()
+        disconnectWatchdog = nil
         let name = connectedModule?.name
             ?? pendingModule?.name
             ?? displayName(for: peripheral)

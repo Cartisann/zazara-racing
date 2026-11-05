@@ -12,7 +12,7 @@ struct WatchConnectionView: View {
     @EnvironmentObject private var manager: GPSLinkManager
     @EnvironmentObject private var settings: AppSettings
 
-    @State private var showSearch = false
+    @State private var isManualSearch = false
 
     var body: some View {
         ScrollView {
@@ -20,23 +20,28 @@ struct WatchConnectionView: View {
                 statusCard
                 controls
 
-                Text(diagnosticText)
-                    .font(.system(size: 8, design: .monospaced))
-                    .foregroundStyle(WatchTheme.tertiary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-
-                if manager.isScanning {
+                if isManualSearch {
                     ProgressView()
                         .tint(WatchTheme.ink)
 
                     Text(settings.t("Scanning"))
                         .font(.system(size: 11))
                         .foregroundStyle(WatchTheme.secondary)
+
+                    if !manager.discoveredModules.isEmpty {
+                        discoveredList
+                    }
                 }
 
-                if !manager.discoveredModules.isEmpty {
-                    discoveredList
+                if !manager.savedModules.isEmpty {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(settings.t("Connection records"))
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(WatchTheme.tertiary)
+                            .padding(.leading, 2)
+
+                        savedList
+                    }
                 }
 
                 if let alert = manager.alert {
@@ -52,6 +57,35 @@ struct WatchConnectionView: View {
         }
         .background(WatchTheme.canvas)
         .navigationTitle(settings.t("Connection"))
+        .onAppear {
+            // Keep the saved-device availability continuously refreshed while
+            // this page is open. New devices stay hidden until Connect is tapped.
+            if !manager.isConnected, !manager.isScanning {
+                manager.startScan()
+            }
+        }
+        .onChange(of: manager.isConnected) { _, connected in
+            // Connecting stops the scan and clears availability; resume the
+            // background scan after a disconnect so saved rows turn green again.
+            if !connected, !manager.isScanning {
+                manager.startScan()
+            }
+        }
+        .overlay {
+            if manager.isConnecting {
+                VStack(spacing: 10) {
+                    Text(settings.t("Connecting"))
+                        .font(.system(size: 36, weight: .bold))
+                        .foregroundStyle(WatchTheme.ink)
+                    ProgressView()
+                        .tint(WatchTheme.ink)
+                }
+                .padding(22)
+                .modifier(LiquidGlassCard())
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.opacity)
+            }
+        }
     }
 
     private var statusCard: some View {
@@ -102,50 +136,67 @@ struct WatchConnectionView: View {
             .tint(WatchTheme.red)
         } else {
             Button {
-                showSearch = true
-            } label: {
-                Label(settings.t("Connect"), systemImage: "link")
-            }
-            .tint(WatchTheme.green)
-
-            if showSearch {
-                Button {
-                    if manager.isScanning {
-                        manager.stopScan()
-                    } else {
+                if isManualSearch {
+                    // Only close the manual search; the background scan keeps
+                    // refreshing saved-device availability.
+                    isManualSearch = false
+                } else {
+                    isManualSearch = true
+                    if !manager.isScanning {
                         manager.startScan()
                     }
-                } label: {
-                    Label(
-                        settings.t(manager.isScanning ? "Stop scanning" : "Search"),
-                        systemImage: manager.isScanning ? "stop.circle.fill" : "magnifyingglass"
-                    )
                 }
-                .tint(WatchTheme.ink)
+            } label: {
+                Label(
+                    settings.t(isManualSearch ? "Stop scanning" : "Connect"),
+                    systemImage: isManualSearch ? "xmark.circle.fill" : "link"
+                )
             }
+            .tint(isManualSearch ? WatchTheme.red : WatchTheme.green)
         }
     }
 
-    private var diagnosticText: String {
-        let state: String
-        switch manager.bluetoothState {
-        case .poweredOn: state = "BT on"
-        case .poweredOff: state = "BT off"
-        case .unauthorized: state = "BT denied"
-        case .unsupported: state = "BT unsupported"
-        case .resetting: state = "BT resetting"
-        case .unknown: state = "BT unknown"
-        @unknown default: state = "BT ?"
+    private var savedList: some View {
+        VStack(spacing: 6) {
+            ForEach(manager.savedModules) { module in
+                Button {
+                    manager.connect(module)
+                } label: {
+                    HStack(spacing: 6) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(module.name)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(WatchTheme.ink)
+                                .lineLimit(1)
+
+                            Text(module.lastLinkedDateText)
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(WatchTheme.tertiary)
+                        }
+
+                        Spacer(minLength: 0)
+
+                        let available = manager.availableSavedModuleIDs.contains(module.id)
+                        ZStack {
+                            Image(systemName: "link")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(available ? WatchTheme.green : WatchTheme.red)
+                            if !available {
+                                Capsule()
+                                    .fill(WatchTheme.red)
+                                    .frame(width: 1.2, height: 14)
+                                    .rotationEffect(.degrees(-45))
+                            }
+                        }
+                        .frame(width: 16, height: 16)
+                    }
+                    .padding(8)
+                    .frame(maxWidth: .infinity)
+                    .background(WatchTheme.muted, in: RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+            }
         }
-        let auth: String
-        switch manager.authorization {
-        case .allowedAlways: auth = "allowed"
-        case .denied: auth = "denied"
-        case .restricted: auth = "restricted"
-        case .notDetermined: auth = "pending"
-        @unknown default: auth = "?"
-        }
-        return "\(state) · \(auth) · scan \(manager.isScanning ? "on" : "off") · \(manager.discoveredModules.count)"
     }
 
     private var discoveredList: some View {
@@ -180,6 +231,26 @@ struct WatchConnectionView: View {
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
+}
+
+// MARK: - Liquid Glass
+
+/// Uses the system Liquid Glass effect on watchOS 26+, with a material
+/// fallback on older watchOS versions.
+private struct LiquidGlassCard: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(watchOS 26.0, *) {
+            content.glassEffect(
+                .regular,
+                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            )
+        } else {
+            content.background(
+                .ultraThinMaterial,
+                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            )
         }
     }
 }

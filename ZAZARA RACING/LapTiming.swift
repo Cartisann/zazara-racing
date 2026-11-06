@@ -521,37 +521,49 @@ struct LapHistoryView: View {
     @State private var sessions: [LapSession] = []
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 10) {
-                if sessions.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "flag.checkered")
-                            .font(.system(size: 32, weight: .semibold))
-                            .foregroundStyle(Color.zzTertiary)
-                        Text(settings.t("No lap records yet"))
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color.zzInk)
-                        Text(settings.t("Finished laps are saved here automatically"))
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.zzSecondary)
-                            .multilineTextAlignment(.center)
+        List {
+            if sessions.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "flag.checkered")
+                        .font(.system(size: 32, weight: .semibold))
+                        .foregroundStyle(Color.zzTertiary)
+                    Text(settings.t("No lap records yet"))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.zzInk)
+                    Text(settings.t("Finished laps are saved here automatically"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.zzSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 120)
+                .padding(.horizontal, 24)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            } else {
+                ForEach(sessions) { session in
+                    NavigationLink {
+                        LapAnalysisView(session: session, autoPlay: false)
+                    } label: {
+                        historyRow(session)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 120)
-                    .padding(.horizontal, 24)
-                } else {
-                    ForEach(sessions) { session in
-                        NavigationLink {
-                            LapAnalysisView(session: session, autoPlay: false)
+                    .buttonStyle(.plain)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            LapSessionStore.delete([session.id])
+                            refresh()
                         } label: {
-                            historyRow(session)
+                            Label(settings.t("Delete"), systemImage: "trash")
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
-            .padding(16)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
         .background(Color.zzCanvas.ignoresSafeArea())
         .navigationTitle(settings.t("Lap records"))

@@ -11,12 +11,14 @@ import SwiftUI
 struct ZAZARA_RACING_WatchApp: App {
     @StateObject private var manager = GPSLinkManager()
     @StateObject private var settings = AppSettings.shared
+    @StateObject private var phoneSync = WatchPhoneSync()
 
     var body: some Scene {
         WindowGroup {
             WatchContentView()
                 .environmentObject(manager)
                 .environmentObject(settings)
+                .environmentObject(phoneSync)
                 .preferredColorScheme(.dark)
         }
     }

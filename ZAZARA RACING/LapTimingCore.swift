@@ -58,6 +58,22 @@ struct LapRecord: Identifiable, Codable, Equatable {
     }
 }
 
+struct WatchSessionSummary: Codable, Identifiable, Equatable {
+    var id: UUID
+    var trackName: String
+    var startedAt: Date
+    var lapCount: Int
+    var bestLapDuration: Double?
+}
+
+struct WatchStatusPayload: Codable, Equatable {
+    var moduleConnected: Bool
+    var moduleName: String?
+    var isRecording: Bool
+    var pendingCount: Int
+    var sessions: [WatchSessionSummary]
+}
+
 struct LapSession: Codable, Equatable, Identifiable {
     var id: UUID
     var trackID: String
@@ -364,11 +380,15 @@ final class LapSessionRecorder: ObservableObject {
             endedAt: nil,
             laps: []
         )
+        // A history record must exist from the moment timing starts.
+        if let session {
+            LapSessionStore.save(session)
+        }
     }
 
     func stop() {
         isRecording = false
-        guard var session, !session.laps.isEmpty else { return }
+        guard var session else { return }
         session.endedAt = Date()
         self.session = session
         LapSessionStore.save(session)

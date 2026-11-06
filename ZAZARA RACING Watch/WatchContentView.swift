@@ -9,31 +9,26 @@
 import SwiftUI
 
 enum WatchPage: Hashable {
-    case timing
-    case connection
+    case status
     case data
 }
 
 struct WatchContentView: View {
     @EnvironmentObject private var manager: GPSLinkManager
-    @State private var page: WatchPage = .timing
+    @State private var page: WatchPage = .status
 
     var body: some View {
         TabView(selection: $page) {
             NavigationStack {
-                WatchTimingView()
+                WatchStatusView()
             }
-            .tag(WatchPage.timing)
-
-            NavigationStack {
-                WatchConnectionView()
-            }
-            .tag(WatchPage.connection)
+            .tag(WatchPage.status)
 
             NavigationStack {
                 WatchDataView()
             }
             .tag(WatchPage.data)
+
         }
         .background(WatchTheme.canvas)
     }

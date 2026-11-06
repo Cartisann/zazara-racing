@@ -399,6 +399,10 @@ struct AppShellView: View {
 struct DragView: View {
     @ObservedObject var manager: GPSLinkManager
     @EnvironmentObject private var settings: AppSettings
+    #if os(iOS)
+    @EnvironmentObject private var watchSync: PhoneWatchSync
+    #endif
+    @State private var showWatchPage = false
     var openDragTiming: () -> Void
     var openTrackTiming: () -> Void
     var openDevices: () -> Void
@@ -425,7 +429,8 @@ struct DragView: View {
                     TimingModeCard(
                         kind: .track,
                         title: settings.t("Track timing"),
-                        onTap: openTrackTiming
+                        onTap: openTrackTiming,
+                        accessory: watchAccessory
                     )
                 }
                 .padding(.horizontal, 12)
@@ -437,6 +442,36 @@ struct DragView: View {
             .background(Color.zzCanvas)
         }
         .background(Color.zzCanvas.ignoresSafeArea())
+        #if os(iOS)
+        .navigationDestination(isPresented: $showWatchPage) {
+            WatchSyncSheet(
+                watchSync: watchSync,
+                manager: manager,
+                track: nil,
+                deviceHardwareID: manager.connectedModule?.hardwareID
+            )
+        }
+        #endif
+    }
+
+    private var watchAccessory: AnyView? {
+        #if os(iOS)
+        AnyView(
+            Button {
+                showWatchPage = true
+            } label: {
+                Image(systemName: "applewatch")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.zzInk)
+                    .padding(8)
+                    .background(Circle().fill(Color.zzMutedSurface))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(settings.t("Watch"))
+        )
+        #else
+        nil
+        #endif
     }
 
     private var timingDeviceStatuses: [TimingDeviceStatus] {
@@ -612,6 +647,7 @@ private struct TimingModeCard: View {
     let title: String
     var badge: String? = nil
     var onTap: (() -> Void)? = nil
+    var accessory: AnyView? = nil
 
     var body: some View {
         if let onTap {
@@ -651,6 +687,10 @@ private struct TimingModeCard: View {
                     .foregroundStyle(Color.zzInk)
 
                 Spacer(minLength: 8)
+
+                if let accessory {
+                    accessory
+                }
 
                 if let badge {
                     Text(badge)
@@ -2002,13 +2042,13 @@ private enum TrackMapCatalog {
     }
 }
 
-private struct ImportedTrack: Codable, Identifiable {
+struct ImportedTrack: Codable, Identifiable {
     let id: String
     let name: String
     let jsonData: Data
 }
 
-private enum TrackStore {
+enum TrackStore {
     private static var directory: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
@@ -3573,6 +3613,7 @@ struct TrackTimingView: View {
     @State private var showEndConfirmation = false
     @State private var showTrackPushResult = false
     @State private var trackPushResult = ""
+    @State private var showWatchPage = false
 
     @EnvironmentObject private var settings: AppSettings
     #if os(iOS)
@@ -3682,9 +3723,6 @@ struct TrackTimingView: View {
                 }
                 .accessibilityLabel(settings.t("Details"))
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                trackPushButton
-            }
             #endif
             #if os(macOS)
             ToolbarItem(placement: .primaryAction) {
@@ -3767,22 +3805,19 @@ struct TrackTimingView: View {
     #if os(iOS)
     private var trackPushButton: some View {
         Button {
-            guard let track = selectedTrack else {
-                trackPushResult = settings.t("Select a track first")
-                showTrackPushResult = true
-                return
-            }
-            watchSync.pushTrack(track)
-            trackPushResult = watchSync.lastPushStatus ?? ""
-            showTrackPushResult = true
+            showWatchPage = true
         } label: {
             Image(systemName: "applewatch")
         }
-        .accessibilityLabel(settings.t("Push to watch"))
-        .alert(settings.t("Push to watch"), isPresented: $showTrackPushResult) {
-            Button(settings.t("OK")) {}
-        } message: {
-            Text(trackPushResult)
+        .accessibilityLabel(settings.t("Watch"))
+        .navigationDestination(isPresented: $showWatchPage) {
+            WatchSyncSheet(
+                watchSync: watchSync,
+                manager: manager,
+                track: selectedTrack,
+                deviceHardwareID: manager.connectedModule?.hardwareID
+                    ?? manager.savedModules.first?.hardwareID
+            )
         }
     }
     #endif

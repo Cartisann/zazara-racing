@@ -270,8 +270,16 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
         }
 
         central.stopScan()
+        // watchOS service-filtered scans can miss module firmwares that other
+        // apps see, so the watch scans unfiltered and filters in didDiscover;
+        // the phone keeps the service filter.
+        #if os(watchOS)
+        let scanServices: [CBUUID]? = nil
+        #else
+        let scanServices: [CBUUID]? = [zazaraServiceUUID]
+        #endif
         central.scanForPeripherals(
-            withServices: [zazaraServiceUUID],
+            withServices: scanServices,
             options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
         )
         isScanning = true
@@ -451,6 +459,39 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
         )
     }
 
+    var hasCachedPeripheral: Bool {
+        UserDefaults.standard.string(forKey: "zazara.cachedPeripheralID") != nil
+    }
+
+    @discardableResult
+    func reconnectCachedPeripheral() -> Bool {
+        guard !isConnected, !isConnecting, linkState == .idle else { return false }
+        ensureCentral()
+        guard let central, central.state == .poweredOn else { return false }
+        guard let uuidString = UserDefaults.standard.string(forKey: "zazara.cachedPeripheralID"),
+              let uuid = UUID(uuidString: uuidString),
+              let peripheral = central.retrievePeripherals(withIdentifiers: [uuid]).first
+        else {
+            print("[BLE] cached reconnect: peripheral not retrieved")
+            return false
+        }
+        print("[BLE] cached reconnect -> \(peripheral.name ?? "-")")
+
+        knownPeripherals[peripheral.identifier] = peripheral
+        pendingModule = SavedGPSModule(
+            id: peripheral.identifier,
+            name: displayName(for: peripheral),
+            lastLinkedAt: Date(),
+            hardwareID: nil
+        )
+        linkState = .connecting(
+            moduleID: peripheral.identifier,
+            name: displayName(for: peripheral)
+        )
+        beginConnectionAttempt()
+        return true
+    }
+
     private func openConnection(to peripheral: CBPeripheral) {
         guard let central, central.state == .poweredOn else {
             failConnection(
@@ -466,6 +507,7 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
 
         activePeripheral = peripheral
         peripheral.delegate = self
+        UserDefaults.standard.set(peripheral.identifier.uuidString, forKey: "zazara.cachedPeripheralID")
         central.connect(peripheral, options: nil)
     }
 
@@ -768,6 +810,10 @@ final class GPSLinkManager: NSObject, ObservableObject, CLLocationManagerDelegat
 
         return String(trimmed[..<range.lowerBound])
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func clearTrackTelemetry() {
+        resetTrackTelemetry()
     }
 
     private func resetTrackTelemetry(startSession: Bool = false) {
@@ -1315,6 +1361,7 @@ extension GPSLinkManager: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        print("[BLE] didConnect \(peripheral.identifier) \(peripheral.name ?? "-")")
         // Ignore a late connect callback after the user cancelled or after a
         // forced link-loss reset.
         guard case .connecting = linkState else {
@@ -1507,6 +1554,7 @@ extension GPSLinkManager: CBCentralManagerDelegate {
 extension GPSLinkManager: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         guard peripheral == activePeripheral else { return }
+        print("[BLE] didDiscoverServices error=\(error?.localizedDescription ?? "-") services=\(peripheral.services?.map { $0.uuid.uuidString } ?? [])")
 
         if isConnected {
             guard error == nil else { return }
@@ -1548,6 +1596,7 @@ extension GPSLinkManager: CBPeripheralDelegate {
         guard peripheral == activePeripheral else { return }
 
         if service.uuid == zazaraServiceUUID {
+            print("[BLE] identity service characteristics=\(service.characteristics?.map { $0.uuid.uuidString } ?? [])")
             guard case .connecting = linkState else { return }
             guard
                 error == nil,
@@ -1611,6 +1660,7 @@ extension GPSLinkManager: CBPeripheralDelegate {
 
         if characteristic.uuid == zazaraIdentityCharacteristicUUID {
             if case .connecting = linkState {
+                print("[BLE] identity value len=\(characteristic.value?.count ?? 0) valid=\(characteristic.value.map { isValidZazaraIdentity($0) } ?? false)")
                 guard
                     error == nil,
                     let value = characteristic.value,

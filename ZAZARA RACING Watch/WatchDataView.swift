@@ -10,14 +10,19 @@ import SwiftUI
 struct WatchDataView: View {
     @EnvironmentObject private var manager: GPSLinkManager
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var phoneSync: WatchPhoneSync
+    @StateObject private var recorder = LapSessionRecorder()
+    @StateObject private var workout = WatchWorkoutSession()
+
+    private var syncedTrack: LapTrackConfig? { phoneSync.syncedTrack }
 
     var body: some View {
         VStack(spacing: 8) {
             speedCard
 
+
             HStack(spacing: 6) {
-                metricCard(settings.t("This lap"), value: "—")
-                metricCard(settings.t("Best result"), value: "—")
+                metricCard(settings.t("Best result"), value: bestLapText)
             }
 
             timeDifferenceCard
@@ -25,6 +30,35 @@ struct WatchDataView: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 8)
         .background(WatchTheme.canvas)
+        .onChange(of: manager.trackTelemetry) { _, telemetry in
+            recorder.ingest(telemetry)
+        }
+        .onChange(of: recorder.isRecording) { _, _ in
+            phoneSync.sendStatus(
+                moduleConnected: manager.isConnected,
+                moduleName: manager.connectedModule?.name,
+                isRecording: recorder.isRecording
+            )
+        }
+        .onChange(of: phoneSync.pauseToken) { _, _ in
+            if recorder.isRecording {
+                recorder.stop()
+                workout.stop()
+            }
+            phoneSync.sendPendingSessions()
+        }
+        .onChange(of: phoneSync.pushSequence) { _, _ in
+            guard phoneSync.hasReceivedPush, let track = phoneSync.syncedTrack, !recorder.isRecording else { return }
+            recorder.start(track: track)
+            workout.start()
+        }
+        .onAppear {
+            guard phoneSync.hasReceivedPush,
+                  let track = phoneSync.syncedTrack,
+                  !recorder.isRecording else { return }
+            recorder.start(track: track)
+            workout.start()
+        }
     }
 
     private var speedCard: some View {
@@ -41,11 +75,26 @@ struct WatchDataView: View {
                     .foregroundStyle(WatchTheme.tertiary)
             }
 
-            Text("\(Int(speed.rounded()))")
-                .font(.system(size: 52, weight: .bold, design: .rounded))
-                .foregroundStyle(WatchTheme.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("\(Int(speed.rounded()))")
+                    .font(.system(size: 42, weight: .bold, design: .rounded))
+                    .foregroundStyle(WatchTheme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+
+                Spacer(minLength: 2)
+
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(settings.t("This lap"))
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(WatchTheme.tertiary)
+                    Text(LapSessionRecorder.formatLapTime(recorder.currentLapElapsed))
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(WatchTheme.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+            }
         }
         .padding(10)
         .frame(maxWidth: .infinity)
@@ -96,8 +145,15 @@ struct WatchDataView: View {
     }
 
     /// No lap-time source yet; the fill appears once a delta is available.
+    private var bestLapText: String {
+        guard let best = recorder.session?.bestLap else { return "—" }
+        return LapSessionRecorder.formatLapTime(best.duration)
+    }
+
+    /// Difference between the running lap and the best completed lap.
     private var timeDifference: Double? {
-        nil
+        guard recorder.isRecording, let best = recorder.session?.bestLap else { return nil }
+        return recorder.currentLapElapsed - best.duration
     }
 
     private var timeDifferenceText: String {

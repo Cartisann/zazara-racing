@@ -493,6 +493,10 @@ final class AppSettings: ObservableObject {
         "SVs": "星数",
         "Edit": "编辑",
         "Done": "完成",
+        "Import": "导入",
+        "Import failed": "导入失败",
+        "Imported %d lap records": "已导入 %d 条圈速记录",
+        "No lap data found in the file": "文件里没有可导入的圈速数据",
         "Drag tiles to reorder": "拖动方块调整位置",
 
         // Success

@@ -879,13 +879,11 @@ struct TrackLibraryView: View {
             .frame(maxWidth: .infinity)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if showSearch {
-                searchBar
-                    .padding(.horizontal, 16)
-                    .padding(.top, 6)
-                    .padding(.bottom, 10)
-                    .background(Color.zzCanvas.opacity(0.96))
-            }
+            searchBar
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
+                .padding(.bottom, 10)
+                .background(Color.zzCanvas.opacity(0.96))
         }
     }
 
@@ -955,12 +953,10 @@ struct TrackLibraryView: View {
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
 
-                    if showSearch {
-                        searchBar
-                            .padding(.horizontal, 12)
-                            .padding(.top, 6)
-                            .padding(.bottom, 10)
-                    }
+                    searchBar
+                        .padding(.horizontal, 12)
+                        .padding(.top, 6)
+                        .padding(.bottom, 10)
                 }
             }
             .frame(width: cardWidth)
@@ -1047,10 +1043,6 @@ struct TrackLibraryView: View {
 
     private var searchBar: some View {
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.zzSecondary)
-
             TextField("搜索赛道", text: $query)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Color.zzInk)
@@ -1066,15 +1058,6 @@ struct TrackLibraryView: View {
                 }
                 .buttonStyle(.plain)
             }
-
-            Button("取消") {
-                query = ""
-                searchFocused = false
-                showSearch = false
-            }
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(Color.zzInk)
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -1107,7 +1090,7 @@ struct TrackLibraryView: View {
     }
 }
 
-private enum ManualGateType: String, CaseIterable, Identifiable {
+enum ManualGateType: String, CaseIterable, Identifiable {
     case start = "起始线"
     case finish = "终点线"
     case startFinish = "起始/终点线"
@@ -1125,7 +1108,7 @@ private enum ManualGateType: String, CaseIterable, Identifiable {
     }
 }
 
-private struct ManualGate: Identifiable {
+struct ManualGate: Identifiable {
     let id = UUID()
     var name: String
     var type: ManualGateType = .start
@@ -1156,6 +1139,8 @@ private struct ManualTrackSheet: View {
     @State private var camera: MapCameraPosition
     @State private var didAutoCenter: Bool
     @State private var isSatellite = false
+    @State private var mapProxy: MapProxy?
+    @State private var mapSize: CGSize = .zero
 
     init(
         manager: GPSLinkManager,
@@ -1398,6 +1383,7 @@ private struct ManualTrackSheet: View {
     }
 
     private var mapEditor: some View {
+        GeometryReader { geo in
         MapReader { proxy in
             Map(position: $camera, interactionModes: [.pan, .zoom, .rotate]) {
                 // 标注层：已保存计时点交给地图原生标注定位。
@@ -1470,21 +1456,33 @@ private struct ManualTrackSheet: View {
                     .annotationTitles(.hidden)
                 }
             }
-            .mapStyle(isSatellite ? .imagery(elevation: .flat) : .standard(elevation: .flat))
+            // Use hybrid: plain .imagery can leave the SwiftUI Map with a
+            // broken gesture state after the style switch.
+            .onAppear {
+                mapProxy = proxy
+                mapSize = geo.size
+            }
+            .onChange(of: geo.size) { _, size in
+                mapSize = size
+            }
+            .mapStyle(isSatellite ? .hybrid(elevation: .flat) : .standard(elevation: .flat))
             .onMapCameraChange(frequency: .continuous) { context in
                 mapSpan = context.region.span.latitudeDelta
                 mapHeading = context.camera.heading
             }
-            .overlay(alignment: .top) {
+            .safeAreaInset(edge: .top, spacing: 0) {
                 if editingIndex != nil {
                     mapTopBar
                         .padding(.horizontal, 12)
                         .padding(.top, 10)
+                        .padding(.bottom, 6)
+                        .background(Color.zzCanvas.opacity(0.001))
                 }
             }
             .overlay(alignment: .topTrailing) {
                 mapControls
             }
+        }
         }
     }
 
@@ -1583,13 +1581,22 @@ private struct ManualTrackSheet: View {
     }
 
     private func addGate() {
-        let mapCenter = camera.region?.center
+        // Prefer the visible screen center (the map may not have published a
+        // fresh camera region after panning); fall back to the camera region.
+        let screenCenter: CLLocationCoordinate2D? = {
+            guard let mapProxy, mapSize.width > 0, mapSize.height > 0 else { return nil }
+            let center = CGPoint(x: mapSize.width / 2, y: mapSize.height / 2)
+            guard let coordinate = mapProxy.convert(center, from: .local) else { return nil }
+            return coordinate
+        }()
+        let mapCenter = screenCenter ?? camera.region?.center
             ?? ChinaMapAlignment.display(
                 initialCenter ?? CLLocationCoordinate2D(latitude: 31.2304, longitude: 121.4737),
                 enabled: alignChinaMap
             )
         let gate = ManualGate(
             name: "新计时点 \(gates.count + 1)",
+            type: gates.isEmpty ? .startFinish : .split,
             coordinate: ChinaMapAlignment.stored(fromMap: mapCenter, enabled: alignChinaMap)
         )
         gates.append(gate)
@@ -1765,7 +1772,7 @@ private struct GateArrowBodyShape: Shape {
     }
 }
 
-private struct GateArrowVisual: View {
+struct GateArrowVisual: View {
     let gate: ManualGate
     let index: Int
     let halfWidth: CGFloat
@@ -1893,6 +1900,7 @@ private struct GateEditingView: View {
 
             handle(at: geometry.tail, icon: "arrow.up.and.down")
                 .gesture(lengthDrag)
+
         }
         .frame(width: canvas, height: canvas)
         .coordinateSpace(name: "gate-edit-space")
@@ -1938,19 +1946,6 @@ private struct GateEditingView: View {
             .onEnded { _ in tipStart = nil }
     }
 
-    private var widthDrag: some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .named("gate-edit-space"))
-            .onChanged { value in
-                let distance = hypot(value.location.x - geometry.center.x, value.location.y - geometry.center.y)
-                if widthStart == nil {
-                    widthStart = WidthStart(halfWidth: halfWidth, distance: distance)
-                }
-                guard let start = widthStart else { return }
-                onWidth(start.halfWidth + (distance - start.distance))
-            }
-            .onEnded { _ in widthStart = nil }
-    }
-
     private var lengthDrag: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named("gate-edit-space"))
             .onChanged { value in
@@ -1963,6 +1958,19 @@ private struct GateEditingView: View {
                 onLength(start.arrowLength + (distance - start.distance) / tailRatio)
             }
             .onEnded { _ in lengthStart = nil }
+    }
+
+    private var widthDrag: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named("gate-edit-space"))
+            .onChanged { value in
+                let distance = hypot(value.location.x - geometry.center.x, value.location.y - geometry.center.y)
+                if widthStart == nil {
+                    widthStart = WidthStart(halfWidth: halfWidth, distance: distance)
+                }
+                guard let start = widthStart else { return }
+                onWidth(start.halfWidth + (distance - start.distance))
+            }
+            .onEnded { _ in widthStart = nil }
     }
 
     private func handle(at point: CGPoint, icon: String) -> some View {

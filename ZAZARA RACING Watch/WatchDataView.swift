@@ -150,15 +150,14 @@ struct WatchDataView: View {
         return LapSessionRecorder.formatLapTime(best.duration)
     }
 
-    /// Difference between the running lap and the best completed lap.
+    /// Live delta against the best lap at the same distance on track.
     private var timeDifference: Double? {
-        guard recorder.isRecording, let best = recorder.session?.bestLap else { return nil }
-        return recorder.currentLapElapsed - best.duration
+        recorder.timeDifference
     }
 
     private var timeDifferenceText: String {
         guard let diff = timeDifference else { return "—" }
-        return String(format: "%.2f", diff)
+        return String(format: "%+.2f", diff)
     }
 
     private func metricCard(_ title: String, value: String, wide: Bool = false) -> some View {

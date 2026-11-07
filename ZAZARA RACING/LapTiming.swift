@@ -15,6 +15,7 @@ import MapKit
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
+import ZIPFoundation
 #if os(iOS)
 import UIKit
 #else
@@ -184,6 +185,16 @@ struct LapAnalysisView: View {
         session.bestLap ?? session.laps.first
     }
 
+    private var shareButton: some View {
+        ShareLink(
+            item: session,
+            preview: SharePreview(session.trackName.isEmpty ? settings.t("Lap records") : session.trackName)
+        ) {
+            Image(systemName: "square.and.arrow.up")
+        }
+        .accessibilityLabel(settings.t("Share"))
+    }
+
     var body: some View {
         GeometryReader { proxy in
             let isWide = proxy.size.width >= 700 && proxy.size.width > proxy.size.height
@@ -216,6 +227,17 @@ struct LapAnalysisView: View {
         }
         .background(Color.zzCanvas.ignoresSafeArea())
         .navigationTitle(settings.t("Details"))
+        .toolbar {
+            #if os(iOS)
+            ToolbarItem(placement: .topBarTrailing) {
+                shareButton
+            }
+            #else
+            ToolbarItem(placement: .primaryAction) {
+                shareButton
+            }
+            #endif
+        }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
@@ -328,7 +350,7 @@ struct LapAnalysisView: View {
 
     private func lapLink(_ lap: LapRecord, compact: Bool) -> some View {
         NavigationLink {
-            LapTimelineView(lap: lap, bestLap: session.bestLap, autoPlay: autoPlay)
+            LapTimelineView(lap: lap, bestLap: session.bestLap, autoPlay: autoPlay, session: session)
         } label: {
             HStack(spacing: 10) {
                 Text(verbatim: "\(lap.id)")
@@ -514,11 +536,290 @@ struct LapAnalysisView: View {
     }
 }
 
+// MARK: - Lap record import
+
+enum LapSessionFileImporter {
+    /// `.data` also covers unknown extensions such as `.rcz`, which the system
+    /// has no declared type for.
+    static var contentTypes: [UTType] { [.json, .data] }
+
+    enum ImportError: LocalizedError {
+        case noLapData
+
+        var errorDescription: String? {
+            switch self {
+            case .noLapData:
+                return "文件里没有可导入的圈速数据"
+            }
+        }
+    }
+
+    /// Reads lap sessions from our own shared .json record, a .rcz archive that
+    /// carries the same JSON, or a RaceChrono session .rcz.
+    static func importSessions(from url: URL) throws -> [LapSession] {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer {
+            if scoped { url.stopAccessingSecurityScopedResource() }
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        if let data = try? Data(contentsOf: url) {
+            if let session = try? decoder.decode(LapSession.self, from: data) {
+                return [session]
+            }
+            if let sessions = try? decoder.decode([LapSession].self, from: data) {
+                return sessions
+            }
+        }
+
+        guard let archive = try? Archive(url: url, accessMode: .read) else {
+            throw ImportError.noLapData
+        }
+
+        if let raceChrono = try? importRaceChronoSession(
+            from: archive,
+            fallbackName: url.deletingPathExtension().lastPathComponent
+        ) {
+            return [raceChrono]
+        }
+
+        var sessions: [LapSession] = []
+        for entry in archive {
+            guard entry.path.lowercased().hasSuffix(".json") else { continue }
+            var entryData = Data()
+            guard (try? archive.extract(entry) { entryData.append($0) }) != nil else { continue }
+            if let session = try? decoder.decode(LapSession.self, from: entryData) {
+                sessions.append(session)
+            } else if let decoded = try? decoder.decode([LapSession].self, from: entryData) {
+                sessions.append(contentsOf: decoded)
+            }
+        }
+        guard !sessions.isEmpty else { throw ImportError.noLapData }
+        return sessions
+    }
+
+    // MARK: RaceChrono session (.rcz)
+
+    private struct RaceChronoSession: Decodable {
+        let trackName: String?
+        let firstTimestamp: Int64?
+        let latestTimestamp: Int64?
+        let laps: [RaceChronoSessionLap]?
+    }
+
+    private struct RaceChronoSessionLap: Decodable {
+        let number: Int?
+        let startTimestamp: Int64?
+        let finishTimestamp: Int64?
+        let isInvalid: Bool?
+    }
+
+    private static func entryData(_ archive: Archive, named name: String) -> Data? {
+        guard let entry = archive[name] else { return nil }
+        var data = Data()
+        guard (try? archive.extract(entry) { data.append($0) }) != nil else { return nil }
+        return data
+    }
+
+    private static func int64Values(_ data: Data) -> [Int64] {
+        let count = data.count / 8
+        var values: [Int64] = []
+        values.reserveCapacity(count)
+        data.withUnsafeBytes { raw in
+            for index in 0..<count {
+                values.append(raw.loadUnaligned(fromByteOffset: index * 8, as: Int64.self))
+            }
+        }
+        return values
+    }
+
+    private static func int32Values(_ data: Data) -> [Int32] {
+        let count = data.count / 4
+        var values: [Int32] = []
+        values.reserveCapacity(count)
+        data.withUnsafeBytes { raw in
+            for index in 0..<count {
+                values.append(raw.loadUnaligned(fromByteOffset: index * 4, as: Int32.self))
+            }
+        }
+        return values
+    }
+
+    /// RaceChrono stores channel data in sibling binary files:
+    /// channel_1 = time (int64 ms), channel_2 = distance (int64 mm),
+    /// channel_3 = packed position (int64: low32 lat, high32 lon, 1e-7 deg),
+    /// channel_5 = altitude (int32 cm), channel_6 = heading (int32 1e-3 deg),
+    /// channel_30002 = satellites (int32).
+    private static func importRaceChronoSession(
+        from archive: Archive,
+        fallbackName: String
+    ) throws -> LapSession {
+        guard
+            let sessionData = entryData(archive, named: "session.json"),
+            let session = try? JSONDecoder().decode(RaceChronoSession.self, from: sessionData),
+            let laps = session.laps,
+            !laps.isEmpty
+        else { throw ImportError.noLapData }
+
+        var times: [Int64] = []
+        var distances: [Int64] = []
+        var positions: [Int64] = []
+        var altitudes: [Int32] = []
+        var headings: [Int32] = []
+        var satellites: [Int32] = []
+
+        for entry in archive {
+            let name = (entry.path as NSString).lastPathComponent
+            guard name.hasPrefix("channel_") else { continue }
+            let parts = name.split(separator: "_")
+            guard parts.count >= 5, let channelID = Int(parts[4]) else { continue }
+            var data = Data()
+            guard (try? archive.extract(entry) { data.append($0) }) != nil else { continue }
+            switch channelID {
+            case 1: times = int64Values(data)
+            case 2: distances = int64Values(data)
+            case 3: positions = int64Values(data)
+            case 5: altitudes = int32Values(data)
+            case 6: headings = int32Values(data)
+            case 30002: satellites = int32Values(data)
+            default: break
+            }
+        }
+
+        guard !times.isEmpty, positions.count >= times.count else {
+            throw ImportError.noLapData
+        }
+
+        let trackName = session.trackName ?? fallbackName
+        let trackID = importRaceChronoTrack(archive: archive, name: trackName) ?? ""
+
+        var records: [LapRecord] = []
+        for (index, lap) in laps.enumerated() {
+            guard
+                let startMs = lap.startTimestamp,
+                let endMs = lap.finishTimestamp,
+                endMs > startMs,
+                let from = times.firstIndex(where: { $0 >= startMs }),
+                let to = times.lastIndex(where: { $0 <= endMs }),
+                to > from
+            else { continue }
+
+            var samples: [LapTelemetrySample] = []
+            samples.reserveCapacity(to - from + 1)
+            for i in from...to {
+                let position = positions[i]
+                let latitudeRaw = Int32(truncatingIfNeeded: position & 0xFFFF_FFFF)
+                let longitudeRaw = Int32(truncatingIfNeeded: (position >> 32) & 0xFFFF_FFFF)
+
+                let speed: Double = {
+                    guard i > from, times[i] > times[i - 1], distances.count > i else { return 0 }
+                    let seconds = Double(times[i] - times[i - 1]) / 1000
+                    let meters = Double(distances[i] - distances[i - 1]) / 1000
+                    guard seconds > 0 else { return 0 }
+                    return min(max(0, meters / seconds * 3.6), 400)
+                }()
+
+                samples.append(LapTelemetrySample(
+                    id: samples.count,
+                    time: Date(timeIntervalSince1970: Double(times[i]) / 1000),
+                    latitude: Double(latitudeRaw) / 10_000_000,
+                    longitude: Double(longitudeRaw) / 10_000_000,
+                    speedKPH: speed,
+                    heading: headings.count > i ? Double(headings[i]) / 1000 : nil,
+                    altitude: altitudes.count > i ? Double(altitudes[i]) / 100 : nil,
+                    satellites: satellites.count > i ? Int(satellites[i]) : nil,
+                    hdop: nil,
+                    vdop: nil,
+                    fix: nil,
+                    distanceKm: distances.count > i ? Double(distances[i]) / 1_000_000 : 0,
+                    elapsed: max(0, Double(times[i] - startMs) / 1000),
+                    lateralG: 0,
+                    longitudinalG: 0
+                ))
+            }
+
+            records.append(LapRecord.build(
+                number: lap.number ?? index + 1,
+                start: Date(timeIntervalSince1970: Double(startMs) / 1000),
+                end: Date(timeIntervalSince1970: Double(endMs) / 1000),
+                samples: samples
+            ))
+        }
+
+        guard !records.isEmpty else { throw ImportError.noLapData }
+
+        let startedAt = Date(
+            timeIntervalSince1970: Double(session.firstTimestamp ?? times[0]) / 1000
+        )
+        let endedAt = Date(
+            timeIntervalSince1970: Double(session.latestTimestamp ?? times[times.count - 1]) / 1000
+        )
+        return LapSession(
+            id: UUID(),
+            trackID: trackID,
+            trackName: trackName,
+            startedAt: startedAt,
+            endedAt: endedAt,
+            laps: records
+        )
+    }
+
+    /// Converts the RaceChrono track traps into our track format so the lap
+    /// detail map can draw the timing points.
+    private static func importRaceChronoTrack(archive: Archive, name: String) -> String? {
+        guard
+            let data = entryData(archive, named: "trackId.json"),
+            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let track = root["track"] as? [String: Any],
+            let traps = track["traps"] as? [[String: Any]]
+        else { return nil }
+
+        var converted: [[String: Any]] = []
+        for trap in traps {
+            guard
+                let latitudeRaw = (trap["centerLatitude"] as? NSNumber)?.intValue,
+                let longitudeRaw = (trap["centerLongitude"] as? NSNumber)?.intValue,
+                latitudeRaw != Int(Int32.max),
+                longitudeRaw != Int(Int32.max)
+            else { continue }
+            let bearing = (trap["bearing"] as? NSNumber)?.doubleValue ?? 0
+            let width = (trap["width"] as? NSNumber)?.doubleValue ?? 20_000
+            let type = (trap["type"] as? NSNumber)?.intValue ?? 4
+            let trapName = trap["name"] as? String ?? "计时点"
+            converted.append([
+                "centerLatitude": latitudeRaw,
+                "centerLongitude": longitudeRaw,
+                "heading": bearing / 1000.0,
+                "width": max(4, width / 1000.0),
+                "length": 80.0,
+                "name": trapName,
+                "type": type == 3 ? "起始/终点线" : "分段计时线",
+            ])
+        }
+
+        guard !converted.isEmpty else { return nil }
+        let payload: [String: Any] = ["track": ["traps": converted]]
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
+
+        let id = "rc-" + UUID().uuidString
+        var tracks = TrackStore.load()
+        tracks.append(ImportedTrack(id: id, name: name, jsonData: jsonData))
+        TrackStore.save(tracks)
+        return id
+    }
+}
+
 // MARK: - History page
 
 struct LapHistoryView: View {
     @EnvironmentObject private var settings: AppSettings
     @State private var sessions: [LapSession] = []
+    @State private var selectedSession: LapSession?
+    @State private var showDetail = false
+    @State private var showImporter = false
+    @State private var importMessage: String?
 
     var body: some View {
         List {
@@ -542,8 +843,9 @@ struct LapHistoryView: View {
                 .listRowSeparator(.hidden)
             } else {
                 ForEach(sessions) { session in
-                    NavigationLink {
-                        LapAnalysisView(session: session, autoPlay: false)
+                    Button {
+                        selectedSession = session
+                        showDetail = true
                     } label: {
                         historyRow(session)
                     }
@@ -569,10 +871,75 @@ struct LapHistoryView: View {
         .navigationTitle(settings.t("Lap records"))
         .onAppear { refresh() }
         .refreshable { refresh() }
+        .navigationDestination(isPresented: $showDetail) {
+            if let session = selectedSession {
+                LapAnalysisView(session: session, autoPlay: false)
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    showImporter = true
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                }
+                .accessibilityLabel(settings.t("Import"))
+            }
+        }
+        .fileImporter(
+            isPresented: $showImporter,
+            allowedContentTypes: LapSessionFileImporter.contentTypes,
+            allowsMultipleSelection: true
+        ) { result in
+            handleImport(result)
+        }
+        .alert(
+            settings.t("Import"),
+            isPresented: Binding(
+                get: { importMessage != nil },
+                set: { if !$0 { importMessage = nil } }
+            )
+        ) {
+            Button(settings.t("Done"), role: .cancel) { importMessage = nil }
+        } message: {
+            if let importMessage {
+                Text(importMessage)
+            }
+        }
     }
 
     private func refresh() {
         sessions = LapSessionStore.allSessions()
+    }
+
+    private func handleImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure:
+            importMessage = settings.t("Import failed")
+        case .success(let urls):
+            var imported = 0
+            var failed = 0
+            for url in urls {
+                do {
+                    let incoming = try LapSessionFileImporter.importSessions(from: url)
+                    for session in incoming {
+                        LapSessionStore.save(session)
+                        imported += 1
+                    }
+                } catch {
+                    failed += 1
+                }
+            }
+            refresh()
+            if imported > 0 {
+                importMessage = String(
+                    format: settings.t("Imported %d lap records"),
+                    imported
+                )
+            } else if failed > 0 {
+                importMessage = settings.t("No lap data found in the file")
+            }
+        }
     }
 
     private func historyRow(_ session: LapSession) -> some View {
@@ -646,6 +1013,7 @@ struct LapTimelineView: View {
     let lap: LapRecord
     let bestLap: LapRecord?
     var autoPlay: Bool = true
+    var session: LapSession? = nil
 
     @EnvironmentObject private var settings: AppSettings
     @State private var isPlaying = false
@@ -1149,12 +1517,13 @@ struct LapTimelineView: View {
         ZStack(alignment: .topTrailing) {
             Group {
                 if satelliteMap {
-                    Map(initialPosition: .automatic) {
+                    Map(initialPosition: .automatic, interactionModes: [.pan, .zoom]) {
                         lapMapContent()
                     }
-                    .mapStyle(.imagery(elevation: .flat))
+                    // hybrid avoids the broken gesture state of pure imagery
+                    .mapStyle(.hybrid(elevation: .flat))
                 } else {
-                    Map(initialPosition: .automatic) {
+                    Map(initialPosition: .automatic, interactionModes: [.pan, .zoom]) {
                         lapMapContent()
                     }
                     .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll, showsTraffic: false))
@@ -1190,6 +1559,35 @@ struct LapTimelineView: View {
         if mapRoute.count >= 2 {
             MapPolyline(coordinates: mapRoute)
                 .stroke(Color.zzRed, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+        }
+
+        ForEach(Array(trackGates.enumerated()), id: \.offset) { index, gate in
+            Annotation(
+                "",
+                coordinate: mapCoordinate(latitude: gate.latitude, longitude: gate.longitude)
+            ) {
+                GateArrowVisual(
+                    gate: ManualGate(
+                        name: "",
+                        type: index == 0 ? .startFinish : .split,
+                        coordinate: CLLocationCoordinate2D(
+                            latitude: gate.latitude,
+                            longitude: gate.longitude
+                        ),
+                        heading: gate.heading,
+                        widthMeters: gate.widthMeters
+                    ),
+                    index: index + 1,
+                    halfWidth: CGFloat(max(8, gate.widthMeters * 1.2)),
+                    arrowLength: 64,
+                    canvas: 180,
+                    mapHeading: 0
+                )
+                // GateArrowVisual lays itself out on a fixed 320pt canvas
+                // (clamped internally), so scale it down to marker size.
+                .scaleEffect(0.32)
+                .frame(width: 104, height: 104)
+            }
         }
 
         if let start = lap.samples.first {
@@ -1258,6 +1656,21 @@ struct LapTimelineView: View {
             return atan2(dLon, dLat) * 180 / .pi
         }
         return 0
+    }
+
+    /// All timing points of the track this lap belongs to.
+    private var trackGates: [LapGate] {
+        guard let trackID = session?.trackID, !trackID.isEmpty else { return [] }
+        return TrackStore.load()
+            .first { $0.id == trackID }
+            .flatMap { definition in
+                LapTrackConfig.load(
+                    jsonData: definition.jsonData,
+                    name: definition.name,
+                    trackID: definition.id
+                )
+            }?
+            .gates ?? []
     }
 
     private var mapRoute: [CLLocationCoordinate2D] {

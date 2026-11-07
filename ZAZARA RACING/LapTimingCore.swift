@@ -1,5 +1,7 @@
 import Combine
+import CoreTransferable
 import Foundation
+import UniformTypeIdentifiers
 
 // MARK: - Models
 
@@ -74,6 +76,23 @@ struct WatchStatusPayload: Codable, Equatable {
     var sessions: [WatchSessionSummary]
 }
 
+extension LapSession: Transferable {
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .json) { session in
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = "yyyy_MM_dd_HH_mm_ss"
+            let base = session.trackName.isEmpty ? "LapSession" : session.trackName
+            let name = "\(base)_\(formatter.string(from: session.startedAt)).json"
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            try encoder.encode(session).write(to: url, options: .atomic)
+            return SentTransferredFile(url)
+        }
+    }
+}
+
 struct LapSession: Codable, Equatable, Identifiable {
     var id: UUID
     var trackID: String
@@ -131,6 +150,7 @@ struct LapTrackConfig: Codable, Equatable, Identifiable {
     var trackID: String
     var name: String
     var gate: LapGate
+    var gates: [LapGate] = []
 
     var id: String { trackID }
 
@@ -179,6 +199,14 @@ struct LapTrackConfig: Codable, Equatable, Identifiable {
         }
 
         guard let best = candidates.min(by: { $0.priority < $1.priority }) else { return nil }
+        let gates = candidates.map {
+            LapGate(
+                latitude: $0.latitude,
+                longitude: $0.longitude,
+                heading: $0.heading,
+                widthMeters: $0.width
+            )
+        }
         return LapTrackConfig(
             trackID: trackID,
             name: name,
@@ -187,7 +215,8 @@ struct LapTrackConfig: Codable, Equatable, Identifiable {
                 longitude: best.longitude,
                 heading: best.heading,
                 widthMeters: best.width
-            )
+            ),
+            gates: gates
         )
     }
 }
@@ -309,10 +338,13 @@ final class LapSessionRecorder: ObservableObject {
     @Published private(set) var session: LapSession?
     @Published private(set) var isRecording = false
     @Published private(set) var currentLapElapsed: TimeInterval = 0
+    /// Live delta against the best lap at the same distance on track.
+    @Published private(set) var liveTimeDifference: Double?
 
     private var detector: LapCrossingDetector?
     private var sessionStart: Date?
     private var lapStart: Date?
+    private var lapStartDistanceKm: Double?
     private var lapSamples: [LapTelemetrySample] = []
     private var previousSample: (date: Date, speedMS: Double, heading: Double?)?
     private var filteredLateralG: Double = 0
@@ -340,7 +372,13 @@ final class LapSessionRecorder: ObservableObject {
         return Self.formatLapTime(currentLapElapsed)
     }
 
+    /// Live delta while a lap is running; otherwise the completed-lap delta
+    /// against the best lap.
     var timeDifference: Double? {
+        liveTimeDifference ?? completedTimeDifference
+    }
+
+    private var completedTimeDifference: Double? {
         guard
             let best = session?.bestLap,
             let last = session?.lastLap,
@@ -361,7 +399,9 @@ final class LapSessionRecorder: ObservableObject {
         detector = track.map { LapCrossingDetector(gate: $0.gate) }
         sessionStart = Date()
         lapStart = nil
+        lapStartDistanceKm = nil
         lapSamples = []
+        liveTimeDifference = nil
         previousSample = nil
         filteredLateralG = 0
         filteredLongitudinalG = 0
@@ -388,10 +428,79 @@ final class LapSessionRecorder: ObservableObject {
 
     func stop() {
         isRecording = false
+        liveTimeDifference = nil
         guard var session else { return }
         session.endedAt = Date()
         self.session = session
         LapSessionStore.save(session)
+    }
+
+    /// Delta vs the best lap at the same distance into the lap. Positive means
+    /// the current lap is slower than the best lap.
+    private func updateLiveDelta(distanceKm: Double) {
+        guard
+            let best = session?.bestLap,
+            let lapStartDistanceKm,
+            let first = best.samples.first,
+            best.samples.count >= 2
+        else {
+            liveTimeDifference = nil
+            return
+        }
+
+        let target = distanceKm - lapStartDistanceKm
+        guard target > 0 else {
+            liveTimeDifference = nil
+            return
+        }
+
+        let bestStart = first.distanceKm
+        var previous: LapTelemetrySample?
+        for sample in best.samples {
+            let relative = sample.distanceKm - bestStart
+            if relative >= target {
+                guard let lo = previous else {
+                    liveTimeDifference = currentLapElapsed - sample.elapsed
+                    return
+                }
+                let loDistance = lo.distanceKm - bestStart
+                let span = relative - loDistance
+                let ratio = span > 0 ? (target - loDistance) / span : 0
+                let bestElapsed = lo.elapsed + (sample.elapsed - lo.elapsed) * ratio
+                liveTimeDifference = currentLapElapsed - bestElapsed
+                return
+            }
+            previous = sample
+        }
+        liveTimeDifference = nil
+    }
+
+    /// Starts a new lap at the crossing sample itself. Previously the buffer
+    /// was cleared here, so the first sample of every lap was taken one tick
+    /// (up to ~1 s) after the timing line.
+    private func beginLap(at sample: LapTelemetrySample) {
+        let crossingSample = LapTelemetrySample(
+            id: sample.id,
+            time: sample.time,
+            latitude: sample.latitude,
+            longitude: sample.longitude,
+            speedKPH: sample.speedKPH,
+            heading: sample.heading,
+            altitude: sample.altitude,
+            satellites: sample.satellites,
+            hdop: sample.hdop,
+            vdop: sample.vdop,
+            fix: sample.fix,
+            distanceKm: sample.distanceKm,
+            elapsed: 0,
+            lateralG: sample.lateralG,
+            longitudinalG: sample.longitudinalG
+        )
+        lapStart = sample.time
+        lapStartDistanceKm = sample.distanceKm
+        lapSamples = [crossingSample]
+        currentLapElapsed = 0
+        liveTimeDifference = nil
     }
 
     func ingest(_ telemetry: TrackTelemetry) {
@@ -450,6 +559,7 @@ final class LapSessionRecorder: ObservableObject {
         if let lapStart {
             lapSamples.append(sample)
             currentLapElapsed = sampleDate.timeIntervalSince(lapStart)
+            updateLiveDelta(distanceKm: telemetry.distanceKm)
         }
 
         guard detector != nil else { return }
@@ -469,16 +579,12 @@ final class LapSessionRecorder: ObservableObject {
             var updated = session
             updated?.laps.append(lap)
             session = updated
-            lapStart = sampleDate
-            lapSamples = []
-            currentLapElapsed = 0
+            beginLap(at: sample)
             if let updated {
                 LapSessionStore.save(updated)
             }
         } else {
-            lapStart = sampleDate
-            lapSamples = []
-            currentLapElapsed = 0
+            beginLap(at: sample)
         }
     }
 }
